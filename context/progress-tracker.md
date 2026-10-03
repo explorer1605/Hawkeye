@@ -65,4 +65,4 @@ change.
   live webcam with overlay)
 - App.tsx unchanged — still uses simulation engine for data, which is
   correct for now
-- Dev server runs on port 3001 (3000 was in use)
+- Web dashboard locked strictly to port 3000 (`strictPort: true`)
