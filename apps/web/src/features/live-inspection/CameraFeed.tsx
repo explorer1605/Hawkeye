@@ -7,6 +7,14 @@ interface CameraFeedProps {
   fps?: number;
 }
 
+interface DefectInspectionResult {
+  status: string;
+  quality: string;
+  defect_type: string | null;
+  action: string;
+  instructions: string;
+}
+
 type CameraState = 'initializing' | 'active' | 'paused' | 'error' | 'denied';
 type FeedSource = 'vision' | 'browser';
 
@@ -29,9 +37,9 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   const animRef = useRef<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  const [cameraState, setCameraState] = useState<CameraState>('active');
-  const [feedSource, setFeedSource] = useState<FeedSource>('vision');
-  const [visionAvailable, setVisionAvailable] = useState<boolean>(true);
+  const [cameraState, setCameraState] = useState<CameraState>('initializing');
+  const [feedSource, setFeedSource] = useState<FeedSource>('browser');
+  const [visionAvailable, setVisionAvailable] = useState<boolean>(false);
   const [liveGpuFps, setLiveGpuFps] = useState<number>(0);
   const [inferenceMs, setInferenceMs] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -45,6 +53,9 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   const [autoFocus, setAutoFocus] = useState<boolean>(true);
   const [focusValue, setFocusValue] = useState<number>(50);
   const [showFocusControls, setShowFocusControls] = useState<boolean>(false);
+
+  // Defect Detection State
+  const [defectResult, setDefectResult] = useState<DefectInspectionResult | null>(null);
 
   // Poll Python Vision Service periodically so we stay on USB camera
   useEffect(() => {
@@ -132,6 +143,92 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     };
   }, [feedSource]);
 
+  // Periodic Defect Inspection
+  useEffect(() => {
+    let active = true;
+    let isInspecting = false;
+    
+    // Reuse a single canvas to avoid memory leaks at 25FPS
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const runInspection = async () => {
+      if (!active || isPausedRef.current || isInspecting) return;
+      
+      let sourceElement: HTMLImageElement | HTMLVideoElement | null = null;
+      if (feedSource === 'vision') {
+        sourceElement = visionImgRef.current;
+      } else {
+        sourceElement = videoRef.current;
+      }
+
+      if (!sourceElement) return;
+
+      isInspecting = true;
+
+      try {
+        if (!ctx) {
+          isInspecting = false;
+          return;
+        }
+
+        let width = 0;
+        let height = 0;
+
+        if (sourceElement instanceof HTMLImageElement) {
+          width = sourceElement.naturalWidth || 1280;
+          height = sourceElement.naturalHeight || 720;
+        } else if (sourceElement instanceof HTMLVideoElement) {
+          width = sourceElement.videoWidth || 1280;
+          height = sourceElement.videoHeight || 720;
+        }
+        
+        if (width === 0 || height === 0) {
+          isInspecting = false;
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(sourceElement, 0, 0, width, height);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob || !active) {
+            isInspecting = false;
+            return;
+          }
+          const formData = new FormData();
+          formData.append('file', blob, 'frame.jpg');
+
+          try {
+            const res = await fetch('http://127.0.0.1:8000/inspect', {
+              method: 'POST',
+              body: formData,
+            });
+            if (res.ok && active) {
+              const data = await res.json();
+              setDefectResult(data);
+            }
+          } catch (e) {
+            // Silently ignore if API is offline
+          } finally {
+            isInspecting = false;
+          }
+        }, 'image/jpeg', 0.5); // slightly reduced compression quality for faster encode at 25fps
+      } catch (e) {
+         console.error('Frame capture error:', e);
+         isInspecting = false;
+      }
+    };
+
+    // Target ~25 FPS (40ms). The `isInspecting` lock guarantees we don't pile up HTTP requests if inference takes >40ms.
+    const intervalId = setInterval(runInspection, 40);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [feedSource]);
+
   // Focus Handlers for USB Camera
   const handleToggleAutoFocus = async (enabled: boolean) => {
     setAutoFocus(enabled);
@@ -205,6 +302,13 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       }
     }
   }, []);
+
+  // Auto-start browser webcam if set as default
+  useEffect(() => {
+    if (feedSource === 'browser' && cameraState === 'initializing') {
+      startBrowserWebcam();
+    }
+  }, [feedSource, cameraState, startBrowserWebcam]);
 
   // Cleanup camera stream on unmount
   useEffect(() => {
@@ -614,6 +718,54 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       {/* Fallback states (loading / error) */}
       {(cameraState === 'initializing' || cameraState === 'error' || cameraState === 'denied') &&
         renderFallbackState()}
+
+      {/* Defect Inspection Overlay */}
+      {defectResult && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            left: '16px',
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: `1px solid ${defectResult.quality === 'good' ? 'var(--overlay-pass)' : 'var(--overlay-fail)'}`,
+            borderRadius: 'var(--radius-card)',
+            padding: '12px 16px',
+            zIndex: 25,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            maxWidth: '320px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-on-dark-muted)', fontWeight: 600, letterSpacing: '0.05em' }}>
+              DEFECT DETECTION
+            </span>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: '12px',
+              backgroundColor: defectResult.quality === 'good' ? 'rgba(61, 220, 132, 0.2)' : 'rgba(255, 107, 99, 0.2)',
+              color: defectResult.quality === 'good' ? '#3DDC84' : '#FF6B63'
+            }}>
+              {defectResult.action.toUpperCase()}
+            </span>
+          </div>
+          
+          <div style={{ fontSize: '1.125rem', fontWeight: 600, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+             {defectResult.quality === 'good' ? 'Quality: Good' : `Defect: ${defectResult.defect_type || 'Unknown'}`}
+          </div>
+          
+          {defectResult.quality !== 'good' && defectResult.instructions && (
+             <div style={{ fontSize: '0.8125rem', color: '#CBD5E1', lineHeight: 1.4 }}>
+               {defectResult.instructions}
+             </div>
+          )}
+        </div>
+      )}
 
       {/* Top header bar */}
       <div

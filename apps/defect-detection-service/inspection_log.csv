@@ -1,0 +1,28 @@
+timestamp,image,result,confidence,defect_type,type_conf,status,action
+2026-10-03T17:45:25,0_slice016_008.png,good,0.999,-,-,Pass,-
+2026-10-03T17:45:25,10_slice037_001.png,good,0.999,-,-,Pass,-
+2026-10-03T17:45:25,11_slice001_014.png,good,0.981,-,-,Pass,-
+2026-10-03T17:45:25,12_slice010_004.png,good,0.974,-,-,Pass,-
+2026-10-03T17:45:25,13_slice029_013.png,good,1.0,-,-,Pass,-
+2026-10-03T17:45:25,14_slice038_002.png,good,1.0,-,-,Pass,-
+2026-10-03T17:45:25,1_slice016_000.png,good,0.996,-,-,Pass,-
+2026-10-03T17:45:25,2_slice031_005.png,good,0.828,-,-,Pass,-
+2026-10-03T17:45:25,3_slice007_006.png,good,0.973,-,-,Pass,-
+2026-10-03T17:45:25,4_slice020_000.png,good,0.999,-,-,Pass,-
+2026-10-03T17:45:25,5_slice000_006.png,good,0.982,-,-,Pass,-
+2026-10-03T17:45:25,6_slice040_014.png,good,1.0,-,-,Pass,-
+2026-10-03T17:45:25,7_slice042_002.png,good,0.994,-,-,Pass,-
+2026-10-03T17:45:25,8_slice022_003.png,good,0.662,-,-,Pass,-
+2026-10-03T17:45:25,9_slice038_010.png,good,0.998,-,-,Pass,-
+2026-10-03T17:45:25,0_slice016_012.png,not-good,0.938,pinhole,0.73,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:25,10_slice027_000.png,not-good,0.955,crack,0.897,Reject/Rework,"Check depth: shallow -> scarf/grind, deep -> scrap. Review mould level, secondary cooling, casting speed."
+2026-10-03T17:45:25,11_slice011_007.png,not-good,0.934,pinhole,0.973,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:25,1_slice047_005.png,not-good,1.0,scratch,0.981,Pass/Review,Usually cosmetic; check guide rollers and handling contact points.
+2026-10-03T17:45:25,2_slice005_014.png,not-good,0.813,pinhole,0.982,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:25,3_slice053_014.png,good,0.955,-,-,Pass,-
+2026-10-03T17:45:26,4_slice033_010.png,good,0.997,-,-,Pass,-
+2026-10-03T17:45:26,5_slice047_010.png,not-good,1.0,pinhole,0.959,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:26,6_slice011_011.png,not-good,0.901,pinhole,0.898,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:26,7_slice043_004.png,not-good,0.56,pinhole,0.747,Rework/Review,Grind/scarf if shallow; check deoxidation and mould powder moisture.
+2026-10-03T17:45:26,8_slice017_008.png,good,0.63,-,-,Pass,-
+2026-10-03T17:45:26,9_slice054_010.png,not-good,0.927,crack,0.747,Reject/Rework,"Check depth: shallow -> scarf/grind, deep -> scrap. Review mould level, secondary cooling, casting speed."

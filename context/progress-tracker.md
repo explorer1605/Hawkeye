@@ -66,3 +66,4 @@ change.
 - App.tsx unchanged — still uses simulation engine for data, which is
   correct for now
 - Web dashboard locked strictly to port 3000 (`strictPort: true`)
+- Created `dimension-service` app using YOLO11 for object height/width measurement with a calibration endpoint (Method 1: Reference Object).
