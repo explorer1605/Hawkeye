@@ -1,0 +1,12 @@
+{
+  "name": "hawkeye",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hawkeye - Automated Billet Vision Inspection System",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @hawkeye/web --filter @hawkeye/api dev",
+    "dev:web": "pnpm --filter @hawkeye/web dev --host",
+    "dev:api": "pnpm --filter @hawkeye/api dev",
+    "build": "pnpm --recursive build"
+  }
+}

@@ -1,0 +1,83 @@
+:root {
+  /* Surfaces */
+  --surface-page: #F4F6F9;
+  --surface-card: #FFFFFF;
+  --surface-sunken: #EDF0F5;
+  --surface-header: #0F1B2D;
+  --surface-header-active: #1A2A44;
+  --surface-video: #0A101C;
+
+  /* Text on light surfaces */
+  --text-primary: #14202F;
+  --text-secondary: #46566C;
+  --text-muted: #5F6F85;
+
+  /* Text on dark surfaces */
+  --text-on-dark: #F2F5FA;
+  --text-on-dark-muted: #A7B4C8;
+
+  /* Lines */
+  --border: #E1E6EE;
+  --border-strong: #C9D1DD;
+  --grid-line: #E8ECF2;
+
+  /* Interactive accent */
+  --accent: #2F6FED;
+  --accent-hover: #2559C4;
+  --focus-ring: #2F6FED;
+
+  /* Status: solid (verdict block, chart lines, icons) */
+  --status-pass: #147A45;
+  --status-fail: #C4302B;
+  --status-rework: #F2A33A;
+  --status-review: #2F6FED;
+  --status-rework-on: #2B1A00;
+
+  /* Status: tint (pills, alert icon circles) */
+  --status-pass-bg: #E4F4EB;
+  --status-pass-text: #0E5C33;
+  --status-fail-bg: #FCEAE8;
+  --status-fail-text: #9E211C;
+  --status-rework-bg: #FFF0D6;
+  --status-rework-text: #7A4A00;
+  --status-review-bg: #E6EFFD;
+  --status-review-text: #1B4DB0;
+
+  /* Status on video */
+  --overlay-pass: #3DDC84;
+  --overlay-fail: #FF6B63;
+  --overlay-rework: #FFB938;
+  --overlay-review: #6BB0FF;
+  --overlay-ink: #0A101C;
+
+  /* Categorical (Defect distribution only; never reused for status) */
+  --cat-1: #3D4FA3;
+  --cat-2: #2B8CA3;
+  --cat-3: #8C5A9E;
+  --cat-4: #B8863B;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(15, 27, 45, 0.05);
+  --shadow-popover: 0 8px 24px rgba(15, 27, 45, 0.14);
+
+  /* Fonts */
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}

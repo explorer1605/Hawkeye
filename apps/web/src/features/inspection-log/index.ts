@@ -1,0 +1,1 @@
+export { InspectionLogView } from './InspectionLogView';
