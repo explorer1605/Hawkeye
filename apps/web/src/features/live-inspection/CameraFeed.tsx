@@ -745,7 +745,6 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               color: feedSource === 'vision' ? '#3DDC84' : '#FFFFFF',
               fontSize: '0.8125rem',
               fontWeight: 600,
-              fontFamily: 'var(--font-mono)',
               letterSpacing: '0.04em',
             }}
           >
@@ -765,7 +764,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
             />
             <span>
               {feedSource === 'vision'
-                ? (cameraState === 'paused' ? 'PAUSED' : 'GPU VISION (RTX 4050)')
+                ? 'GPU VISION (RTX 4050)'
                 : cameraState === 'active'
                   ? 'LIVE WEBCAM'
                   : cameraState === 'paused'
