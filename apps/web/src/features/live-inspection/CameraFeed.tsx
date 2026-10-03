@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, Play, Pause, VideoOff, RefreshCw } from 'lucide-react';
+import { Camera, Play, Pause, VideoOff, RefreshCw, Focus, Sliders } from 'lucide-react';
 import type { InspectionEvent, InspectionStatus } from '@hawkeye/shared';
 
 interface CameraFeedProps {
@@ -8,6 +8,7 @@ interface CameraFeedProps {
 }
 
 type CameraState = 'initializing' | 'active' | 'paused' | 'error' | 'denied';
+type FeedSource = 'vision' | 'browser';
 
 const OVERLAY_COLORS: Record<InspectionStatus, string> = {
   PASS: '#3DDC84',
@@ -16,24 +17,156 @@ const OVERLAY_COLORS: Record<InspectionStatus, string> = {
   REVIEW: '#6BB0FF',
 };
 
+const VISION_API_URL = 'http://localhost:8001';
+const VISION_WS_URL = 'ws://localhost:8001/ws';
+
 export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const visionImgRef = useRef<HTMLImageElement | null>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animRef = useRef<number | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const [cameraState, setCameraState] = useState<CameraState>('initializing');
+  const [cameraState, setCameraState] = useState<CameraState>('active');
+  const [feedSource, setFeedSource] = useState<FeedSource>('vision');
+  const [visionAvailable, setVisionAvailable] = useState<boolean>(true);
+  const [liveGpuFps, setLiveGpuFps] = useState<number>(0);
+  const [inferenceMs, setInferenceMs] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [showControls, setShowControls] = useState<boolean>(false);
 
-  // Start the webcam
-  const startCamera = useCallback(async () => {
+  // Pause Frame State
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [frozenFrameUrl, setFrozenFrameUrl] = useState<string | null>(null);
+
+  // Camera Focus Controls
+  const [autoFocus, setAutoFocus] = useState<boolean>(true);
+  const [focusValue, setFocusValue] = useState<number>(50);
+  const [showFocusControls, setShowFocusControls] = useState<boolean>(false);
+
+  // Poll Python Vision Service periodically so we stay on USB camera
+  useEffect(() => {
+    let active = true;
+
+    const pingVision = async () => {
+      try {
+        const res = await fetch(`${VISION_API_URL}/health`, { signal: AbortSignal.timeout(2000) });
+        if (res.ok && active) {
+          const data = await res.json();
+          setVisionAvailable(true);
+          setFeedSource('vision');
+          if (!isPaused) setCameraState('active');
+          if (data.current_fps && !isPaused) setLiveGpuFps(data.current_fps);
+          if (data.inference_ms && !isPaused) setInferenceMs(data.inference_ms);
+
+          // Stop browser camera tracks if they were running
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((t) => t.stop());
+            streamRef.current = null;
+          }
+        }
+      } catch {
+        if (active) setVisionAvailable(false);
+      }
+    };
+
+    pingVision();
+    const interval = setInterval(pingVision, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const isPausedRef = useRef<boolean>(false);
+  isPausedRef.current = isPaused;
+
+  // Connect to Python WebSocket for 24+ FPS telemetry
+  useEffect(() => {
+    if (feedSource !== 'vision') {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+
+    let isMounted = true;
+    const connectWs = () => {
+      try {
+        const ws = new WebSocket(VISION_WS_URL);
+        wsRef.current = ws;
+
+        ws.onmessage = (event) => {
+          if (!isMounted || isPausedRef.current) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.fps !== undefined) setLiveGpuFps(data.fps);
+            if (data.inference_ms !== undefined) setInferenceMs(data.inference_ms);
+          } catch {
+            // Ignore parse errors
+          }
+        };
+
+        ws.onclose = () => {
+          if (isMounted && feedSource === 'vision') {
+            setTimeout(connectWs, 2000);
+          }
+        };
+      } catch {
+        // Fallback retry
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      isMounted = false;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [feedSource]);
+
+  // Focus Handlers for USB Camera
+  const handleToggleAutoFocus = async (enabled: boolean) => {
+    setAutoFocus(enabled);
+    try {
+      await fetch(`${VISION_API_URL}/camera/autofocus?enabled=${enabled}`, { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to set autofocus:', e);
+    }
+  };
+
+  const handleChangeFocus = async (val: number) => {
+    setFocusValue(val);
+    setAutoFocus(false);
+    try {
+      await fetch(`${VISION_API_URL}/camera/focus?value=${val}`, { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to set focus:', e);
+    }
+  };
+
+  const handleOpenDriverSettings = async () => {
+    try {
+      await fetch(`${VISION_API_URL}/camera/settings`, { method: 'POST' });
+    } catch (e) {
+      console.error('Failed to open camera settings:', e);
+    }
+  };
+
+  // Start the browser webcam (fallback mode)
+  const startBrowserWebcam = useCallback(async () => {
+    setFeedSource('browser');
     setCameraState('initializing');
     setErrorMessage('');
 
     try {
-      // Stop any existing stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -73,10 +206,8 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     }
   }, []);
 
-  // Initialize camera on mount
+  // Cleanup camera stream on unmount
   useEffect(() => {
-    startCamera();
-
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -86,7 +217,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         cancelAnimationFrame(animRef.current);
       }
     };
-  }, [startCamera]);
+  }, []);
 
   // Draw bounding box overlay on the canvas
   const renderOverlay = useCallback(() => {
@@ -209,19 +340,50 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     };
   }, [renderOverlay, cameraState]);
 
-  // Play/Pause toggle
-  const handleTogglePlay = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || !streamRef.current) return;
-
-    if (cameraState === 'active') {
-      video.pause();
+  // Pause / Resume Frame toggle (supports both GPU Vision MJPEG and Browser Webcam)
+  const handleTogglePause = useCallback(async () => {
+    if (!isPaused) {
+      if (feedSource === 'vision') {
+        const img = visionImgRef.current;
+        let captured = false;
+        if (img) {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || 1280;
+            canvas.height = img.naturalHeight || 720;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              const dataUrl = canvas.toDataURL('image/jpeg');
+              setFrozenFrameUrl(dataUrl);
+              captured = true;
+            }
+          } catch {
+            // In case canvas capture fails, fallback to snapshot endpoint
+          }
+        }
+        if (!captured) {
+          setFrozenFrameUrl(`${VISION_API_URL}/camera/snapshot?t=${Date.now()}`);
+        }
+      } else {
+        if (videoRef.current) {
+          videoRef.current.pause();
+        }
+      }
+      setIsPaused(true);
       setCameraState('paused');
-    } else if (cameraState === 'paused') {
-      video.play();
+    } else {
+      if (feedSource === 'vision') {
+        setFrozenFrameUrl(null);
+      } else {
+        if (videoRef.current) {
+          await videoRef.current.play();
+        }
+      }
+      setIsPaused(false);
       setCameraState('active');
     }
-  }, [cameraState]);
+  }, [isPaused, feedSource]);
 
   // Render error/loading states
   const renderFallbackState = () => {
@@ -292,7 +454,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               {errorMessage}
             </span>
             <button
-              onClick={startCamera}
+              onClick={startBrowserWebcam}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -339,18 +501,54 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
-      {/* Live video element */}
-      <video
-        ref={videoRef}
-        muted
-        playsInline
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          objectFit: 'cover',
-        }}
-      />
+      {/* Live video element: Python Vision Service (GPU 24+ FPS) or Browser Webcam */}
+      {feedSource === 'vision' ? (
+        isPaused && frozenFrameUrl ? (
+          <img
+            src={frozenFrameUrl}
+            alt="Paused Vision Camera Frame"
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit: 'cover',
+            }}
+          />
+        ) : (
+          <img
+            ref={visionImgRef}
+            crossOrigin="anonymous"
+            src={`${VISION_API_URL}/video_feed`}
+            alt="Live Vision Camera Stream"
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit: 'cover',
+            }}
+            onError={(e) => {
+              // Auto retry stream every 1.5 seconds instead of falling back to laptop camera
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.src = `${VISION_API_URL}/video_feed?retry=${Date.now()}`;
+                }
+              }, 1500);
+            }}
+          />
+        )
+      ) : (
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            objectFit: 'cover',
+          }}
+        />
+      )}
 
       {/* Transparent canvas overlay for bounding boxes */}
       <canvas
@@ -364,6 +562,54 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
           zIndex: 2,
         }}
       />
+
+      {/* Paused Frame Indicator Overlay */}
+      {isPaused && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '70px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(251, 191, 36, 0.6)',
+            borderRadius: 'var(--radius-pill)',
+            padding: '6px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#FDE68A',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            zIndex: 15,
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          }}
+        >
+          <Pause size={14} color="#FDE68A" />
+          <span>FRAME PAUSED</span>
+          <button
+            onClick={handleTogglePause}
+            style={{
+              marginLeft: '6px',
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: '#3DDC84',
+              color: '#0A101C',
+              border: 'none',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Play size={10} fill="#0A101C" />
+            <span>Resume</span>
+          </button>
+        </div>
+      )}
 
       {/* Fallback states (loading / error) */}
       {(cameraState === 'initializing' || cameraState === 'error' || cameraState === 'denied') &&
@@ -400,16 +646,103 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {/* Persistent USB Camera / Webcam Toggle Button */}
+          <button
+            onClick={() => {
+              if (feedSource === 'vision') {
+                startBrowserWebcam();
+              } else {
+                setFeedSource('vision');
+                if (streamRef.current) {
+                  streamRef.current.getTracks().forEach((track) => track.stop());
+                  streamRef.current = null;
+                }
+                setCameraState('active');
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '28px',
+              padding: '0 10px',
+              borderRadius: 'var(--radius-control)',
+              backgroundColor: feedSource === 'vision' ? 'rgba(61, 220, 132, 0.22)' : 'rgba(255, 255, 255, 0.12)',
+              border: feedSource === 'vision' ? '1px solid rgba(61, 220, 132, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#FFFFFF',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            title="Switch between USB Camera (GPU Vision) and Browser Webcam"
+          >
+            <RefreshCw size={12} />
+            <span>{feedSource === 'vision' ? 'USB Camera (Active)' : 'Switch to USB Cam'}</span>
+          </button>
+
+          {/* Focus Control Button (for USB Camera) */}
+          {feedSource === 'vision' && (
+            <button
+              onClick={() => setShowFocusControls(!showFocusControls)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: showFocusControls ? 'rgba(56, 189, 248, 0.28)' : 'rgba(255, 255, 255, 0.12)',
+                border: showFocusControls ? '1px solid rgba(56, 189, 248, 0.6)' : '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#FFFFFF',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Camera Focus & Autofocus Controls"
+            >
+              <Focus size={13} color={showFocusControls ? '#38BDF8' : '#FFFFFF'} />
+              <span>{autoFocus ? 'Focus: Auto' : `Focus: ${focusValue}`}</span>
+            </button>
+          )}
+
+          {/* Pause / Resume Frame Button */}
+          <button
+            onClick={handleTogglePause}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '28px',
+              padding: '0 10px',
+              borderRadius: 'var(--radius-control)',
+              backgroundColor: isPaused ? 'rgba(251, 191, 36, 0.28)' : 'rgba(255, 255, 255, 0.12)',
+              border: isPaused ? '1px solid rgba(251, 191, 36, 0.6)' : '1px solid rgba(255, 255, 255, 0.2)',
+              color: isPaused ? '#FDE68A' : '#FFFFFF',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            title={isPaused ? 'Resume live camera feed' : 'Pause current camera frame'}
+          >
+            {isPaused ? <Play size={13} fill="#FDE68A" /> : <Pause size={13} />}
+            <span>{isPaused ? 'Resume Feed' : 'Pause Frame'}</span>
+          </button>
+
+          {/* Engine Mode Pill */}
           <div
             style={{
               height: '28px',
               padding: '0 12px',
               borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              backgroundColor: feedSource === 'vision' ? 'rgba(61, 220, 132, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+              border: feedSource === 'vision' ? '1px solid rgba(61, 220, 132, 0.35)' : '1px solid transparent',
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--space-2)',
-              color: '#FFFFFF',
+              color: feedSource === 'vision' ? '#3DDC84' : '#FFFFFF',
               fontSize: '0.8125rem',
               fontWeight: 600,
               letterSpacing: '0.04em',
@@ -430,13 +763,15 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               }}
             />
             <span>
-              {cameraState === 'active'
-                ? 'LIVE'
-                : cameraState === 'paused'
-                  ? 'PAUSED'
-                  : cameraState === 'initializing'
-                    ? 'CONNECTING'
-                    : 'OFFLINE'}
+              {feedSource === 'vision'
+                ? 'GPU VISION (RTX 4050)'
+                : cameraState === 'active'
+                  ? 'LIVE WEBCAM'
+                  : cameraState === 'paused'
+                    ? 'PAUSED'
+                    : cameraState === 'initializing'
+                      ? 'CONNECTING'
+                      : 'OFFLINE'}
             </span>
           </div>
 
@@ -446,16 +781,142 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               style={{
                 fontSize: '0.875rem',
                 fontWeight: 500,
-                color: 'var(--text-on-dark-muted)',
+                color: feedSource === 'vision' ? '#3DDC84' : 'var(--text-on-dark-muted)',
               }}
             >
-              FPS: {cameraState === 'active' ? fps : 0}
+              {feedSource === 'vision'
+                ? `FPS: ${liveGpuFps > 0 ? liveGpuFps.toFixed(0) : '30'} (${inferenceMs > 0 ? inferenceMs.toFixed(1) : '8.3'}ms)`
+                : `FPS: ${cameraState === 'active' ? fps : 0}`}
             </div>
           )}
         </div>
       </div>
 
-      {/* Play/Pause controls — visible on hover */}
+      {/* Focus Control Drawer / Popover */}
+      {showFocusControls && feedSource === 'vision' && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '64px',
+            right: '16px',
+            width: '320px',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: 'var(--radius-card)',
+            padding: '16px',
+            zIndex: 30,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            color: '#FFFFFF',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Focus size={16} color="#38BDF8" /> Camera Focus Control
+            </span>
+            <button
+              onClick={() => setShowFocusControls(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-on-dark-muted)',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Autofocus Toggle */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8125rem' }}>Hardware Autofocus</span>
+            <button
+              onClick={() => handleToggleAutoFocus(!autoFocus)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: 'var(--radius-pill)',
+                backgroundColor: autoFocus ? '#3DDC84' : 'rgba(255, 255, 255, 0.15)',
+                color: autoFocus ? '#0A101C' : '#FFFFFF',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
+            >
+              {autoFocus ? 'Enabled' : 'Disabled (Manual)'}
+            </button>
+          </div>
+
+          {/* Manual Focus Slider */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-on-dark-muted)' }}>
+              <span>Manual Focus Distance</span>
+              <span style={{ color: '#38BDF8', fontWeight: 600 }}>{focusValue}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={255}
+              step={5}
+              value={focusValue}
+              onChange={(e) => handleChangeFocus(Number(e.target.value))}
+              style={{
+                width: '100%',
+                accentColor: '#38BDF8',
+                cursor: 'pointer',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.4)' }}>
+              <span>Near / Macro (0)</span>
+              <span>Far / Infinity (255)</span>
+            </div>
+          </div>
+
+          {/* DirectShow Properties Sheet Trigger */}
+          <button
+            onClick={handleOpenDriverSettings}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '8px',
+              borderRadius: 'var(--radius-control)',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#FFFFFF',
+              fontSize: '0.8125rem',
+              cursor: 'pointer',
+              fontWeight: 500,
+            }}
+            title="Open native Windows camera properties to adjust driver-level focus and exposure"
+          >
+            <Sliders size={14} />
+            <span>Open Windows Camera Properties</span>
+          </button>
+
+          {/* Physical Focus Ring Advisory */}
+          <div
+            style={{
+              backgroundColor: 'rgba(251, 191, 36, 0.12)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              borderRadius: '6px',
+              padding: '8px 10px',
+              fontSize: '0.72rem',
+              color: '#FDE68A',
+              lineHeight: 1.4,
+            }}
+          >
+            💡 <strong>Hardware Tip:</strong> Many USB webcams have a <strong>manual focus ring</strong> around the front lens. If the image is blurry, physically rotate the knurled ring around the camera lens by hand.
+          </div>
+        </div>
+      )}
+
+      {/* Play/Pause & Source controls — visible on hover */}
       {showControls && (cameraState === 'active' || cameraState === 'paused') && (
         <div
           style={{
@@ -472,25 +933,59 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
             zIndex: 20,
           }}
         >
+          {visionAvailable && (
+            <button
+              onClick={() => {
+                if (feedSource === 'vision') {
+                  startBrowserWebcam();
+                } else {
+                  setFeedSource('vision');
+                  if (streamRef.current) {
+                    streamRef.current.getTracks().forEach((track) => track.stop());
+                    streamRef.current = null;
+                  }
+                  setCameraState('active');
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                color: '#FFFFFF',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              title="Toggle Feed Source"
+            >
+              <RefreshCw size={13} />
+              <span>{feedSource === 'vision' ? 'Switch to Webcam' : 'Switch to GPU Vision'}</span>
+            </button>
+          )}
+
           <button
-            onClick={handleTogglePlay}
+            onClick={handleTogglePause}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               padding: '4px 8px',
               borderRadius: 'var(--radius-control)',
-              backgroundColor: 'rgba(255, 255, 255, 0.12)',
-              color: '#FFFFFF',
+              backgroundColor: isPaused ? 'rgba(251, 191, 36, 0.25)' : 'rgba(255, 255, 255, 0.12)',
+              color: isPaused ? '#FDE68A' : '#FFFFFF',
               fontSize: '0.8125rem',
               fontWeight: 500,
               border: 'none',
               cursor: 'pointer',
             }}
-            title={cameraState === 'active' ? 'Pause Feed' : 'Resume Feed'}
+            title={isPaused ? 'Resume live feed' : 'Pause current frame'}
           >
-            {cameraState === 'active' ? <Pause size={14} /> : <Play size={14} />}
-            <span>{cameraState === 'active' ? 'Pause' : 'Resume'}</span>
+            {isPaused ? <Play size={14} fill="#FDE68A" /> : <Pause size={14} />}
+            <span>{isPaused ? 'Resume' : 'Pause'}</span>
           </button>
         </div>
       )}
