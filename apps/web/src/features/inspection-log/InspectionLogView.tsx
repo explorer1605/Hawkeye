@@ -96,21 +96,21 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
       <div
         className="bv-card"
         style={{
-          padding: '12px var(--space-6)',
+          padding: '10px var(--space-5)',
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: 'var(--space-4)',
+          gap: 'var(--space-3)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', width: '320px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: '280px' }}>
             <Search
-              size={18}
+              size={15}
               style={{
                 position: 'absolute',
-                left: '12px',
+                left: '10px',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 color: 'var(--text-muted)',
@@ -118,7 +118,7 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
             />
             <input
               type="text"
-              placeholder="Search billet ID"
+              placeholder="Search billet ID..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -126,21 +126,21 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
               }}
               style={{
                 width: '100%',
-                height: '40px',
-                paddingLeft: '38px',
-                paddingRight: '12px',
+                height: '34px',
+                paddingLeft: '32px',
+                paddingRight: '10px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
                 color: 'var(--text-primary)',
-                fontSize: '0.875rem',
+                fontSize: '0.8125rem',
                 outline: 'none',
               }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Status:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -148,13 +148,13 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                 setCurrentPage(1);
               }}
               style={{
-                height: '40px',
-                padding: '0 12px',
+                height: '34px',
+                padding: '0 8px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
                 color: 'var(--text-primary)',
-                fontSize: '0.875rem',
+                fontSize: '0.8125rem',
               }}
             >
               <option value="ALL">All Statuses</option>
@@ -165,8 +165,8 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Defect:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Defect:</span>
             <select
               value={defectFilter}
               onChange={(e) => {
@@ -174,13 +174,13 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                 setCurrentPage(1);
               }}
               style={{
-                height: '40px',
-                padding: '0 12px',
+                height: '34px',
+                padding: '0 8px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
                 color: 'var(--text-primary)',
-                fontSize: '0.875rem',
+                fontSize: '0.8125rem',
               }}
             >
               <option value="ALL">All Defects</option>
@@ -196,24 +196,24 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
           onClick={handleExportExcel}
           title="Exports the current filters"
           style={{
-            height: '40px',
-            padding: '0 20px',
+            height: '34px',
+            padding: '0 14px',
             borderRadius: 'var(--radius-control)',
             backgroundColor: 'var(--accent)',
             color: '#FFFFFF',
-            fontSize: '1rem',
-            fontWeight: 500,
+            fontSize: '0.8125rem',
+            fontWeight: 600,
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '6px',
             boxShadow: '0 1px 2px rgba(47, 111, 237, 0.2)',
             transition: 'background-color 150ms ease-out',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent-hover)')}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--accent)')}
         >
-          <Download size={18} strokeWidth={2} />
-          <span>Export to Excel</span>
+          <Download size={15} strokeWidth={2} />
+          <span>Export Excel</span>
         </button>
       </div>
 
@@ -230,43 +230,45 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
               <tr
                 style={{
                   backgroundColor: 'var(--surface-sunken)',
-                  height: '44px',
+                  height: '38px',
                   borderBottom: '1px solid var(--border)',
                   color: 'var(--text-secondary)',
-                  fontSize: '0.875rem',
+                  fontSize: '0.75rem',
                   fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
                 }}
               >
                 <th
                   onClick={() => handleSort('timestamp')}
-                  style={{ padding: '0 20px', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ padding: '0 16px', cursor: 'pointer', userSelect: 'none' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>Time</span>
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </div>
                 </th>
                 <th
                   onClick={() => handleSort('billetId')}
-                  style={{ padding: '0 20px', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ padding: '0 16px', cursor: 'pointer', userSelect: 'none' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>Billet ID</span>
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ padding: '0 20px', textAlign: 'right' }}>Length</th>
-                <th style={{ padding: '0 20px', textAlign: 'right' }}>Width</th>
-                <th style={{ padding: '0 20px', textAlign: 'right' }}>Height</th>
-                <th style={{ padding: '0 20px' }}>Defect</th>
-                <th style={{ padding: '0 20px', textAlign: 'right' }}>Confidence</th>
+                <th style={{ padding: '0 16px', textAlign: 'right' }}>Length</th>
+                <th style={{ padding: '0 16px', textAlign: 'right' }}>Width</th>
+                <th style={{ padding: '0 16px', textAlign: 'right' }}>Height</th>
+                <th style={{ padding: '0 16px' }}>Defect</th>
+                <th style={{ padding: '0 16px', textAlign: 'right' }}>Confidence</th>
                 <th
                   onClick={() => handleSort('status')}
-                  style={{ padding: '0 20px', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ padding: '0 16px', cursor: 'pointer', userSelect: 'none' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>Status</span>
-                    <ArrowUpDown size={14} />
+                    <ArrowUpDown size={12} />
                   </div>
                 </th>
               </tr>
@@ -278,10 +280,10 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                   <td
                     colSpan={8}
                     style={{
-                      padding: '48px 0',
+                      padding: '36px 0',
                       textAlign: 'center',
                       color: 'var(--text-muted)',
-                      fontSize: '0.875rem',
+                      fontSize: '0.8125rem',
                     }}
                   >
                     No matching inspection records found.
@@ -292,28 +294,28 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                   <tr
                     key={row.eventId}
                     style={{
-                      height: '52px',
+                      height: '40px',
                       borderBottom: '1px solid var(--border)',
-                      fontSize: '1rem',
+                      fontSize: '0.875rem',
                       color: 'var(--text-primary)',
                       transition: 'background-color 150ms ease-out',
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F7F9FC')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <td className="tabular" style={{ padding: '0 20px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    <td className="tabular" style={{ padding: '0 16px', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                       {formatTime(row.timestamp)}
                     </td>
-                    <td className="font-mono" style={{ padding: '0 20px', fontWeight: 500 }}>
+                    <td className="font-mono" style={{ padding: '0 16px', fontWeight: 600, fontSize: '0.8125rem' }}>
                       {row.billetId}
                     </td>
-                    <td className="tabular" style={{ padding: '0 20px', textAlign: 'right' }}>
+                    <td className="tabular" style={{ padding: '0 16px', textAlign: 'right' }}>
                       {formatDimension(row.lengthMm, true)}
                     </td>
                     <td
                       className="tabular"
                       style={{
-                        padding: '0 20px',
+                        padding: '0 16px',
                         textAlign: 'right',
                         color:
                           row.widthMm < 148 || row.widthMm > 152
@@ -323,16 +325,16 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                     >
                       {formatDimension(row.widthMm)}
                     </td>
-                    <td className="tabular" style={{ padding: '0 20px', textAlign: 'right' }}>
+                    <td className="tabular" style={{ padding: '0 16px', textAlign: 'right' }}>
                       {formatDimension(row.heightMm)}
                     </td>
-                    <td style={{ padding: '0 20px', color: row.defect === 'None' ? 'var(--text-muted)' : 'inherit' }}>
+                    <td style={{ padding: '0 16px', color: row.defect === 'None' ? 'var(--text-muted)' : 'inherit' }}>
                       {row.defect}
                     </td>
-                    <td className="tabular" style={{ padding: '0 20px', textAlign: 'right' }}>
+                    <td className="tabular" style={{ padding: '0 16px', textAlign: 'right' }}>
                       {formatConfidence(row.confidence)}
                     </td>
-                    <td style={{ padding: '0 20px' }}>
+                    <td style={{ padding: '0 16px' }}>
                       <StatusPill status={row.status} />
                     </td>
                   </tr>
@@ -344,8 +346,8 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
 
         <div
           style={{
-            height: '56px',
-            padding: '0 var(--space-6)',
+            height: '46px',
+            padding: '0 var(--space-5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -353,7 +355,7 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
             backgroundColor: 'var(--surface-card)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
             <span>Rows per page:</span>
             <select
               value={rowsPerPage}
@@ -362,11 +364,12 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                 setCurrentPage(1);
               }}
               style={{
-                height: '36px',
-                padding: '0 8px',
+                height: '30px',
+                padding: '0 6px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
+                fontSize: '0.8125rem',
               }}
             >
               <option value={10}>10</option>
@@ -376,17 +379,17 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
             </select>
           </div>
 
-          <div className="tabular" style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          <div className="tabular" style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
             {totalRows > 0 ? `${startIndex + 1}–${Math.min(startIndex + rowsPerPage, totalRows)} of ${totalRows}` : '0 of 0'}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
               style={{
-                width: '44px',
-                height: '44px',
+                width: '32px',
+                height: '32px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
@@ -397,14 +400,14 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                 cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
               }}
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={16} />
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
               style={{
-                width: '44px',
-                height: '44px',
+                width: '32px',
+                height: '32px',
                 borderRadius: 'var(--radius-control)',
                 border: '1px solid var(--border-strong)',
                 backgroundColor: 'var(--surface-card)',
@@ -415,7 +418,7 @@ export const InspectionLogView: React.FC<InspectionLogViewProps> = ({ events }) 
                 cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
               }}
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>

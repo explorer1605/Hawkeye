@@ -14,22 +14,22 @@ const VERDICT_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   PASS: {
-    bg: 'var(--status-pass)',
+    bg: '#147A45',
     text: '#FFFFFF',
     label: 'PASS',
   },
   FAIL: {
-    bg: 'var(--status-fail)',
+    bg: '#C4302B',
     text: '#FFFFFF',
     label: 'FAIL',
   },
   REWORK: {
-    bg: 'var(--status-rework)',
-    text: 'var(--status-rework-on)',
+    bg: '#D97706',
+    text: '#FFFFFF',
     label: 'REWORK',
   },
   REVIEW: {
-    bg: 'var(--status-review)',
+    bg: '#2563EB',
     text: '#FFFFFF',
     label: 'REVIEW',
   },
@@ -47,14 +47,17 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
+        padding: 'var(--space-5)',
       }}
     >
       <div
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 'var(--space-5)',
+          marginBottom: 'var(--space-4)',
+          paddingBottom: 'var(--space-3)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         <div>
@@ -62,25 +65,26 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-2)',
-              fontSize: '1.25rem',
-              lineHeight: '1.75rem',
+              gap: '6px',
+              fontSize: '0.8125rem',
               fontWeight: 600,
-              color: 'var(--text-primary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'var(--text-secondary)',
             }}
           >
-            <Focus size={22} strokeWidth={1.75} style={{ color: 'var(--text-secondary)' }} />
-            <span>Current Inspection</span>
+            <Focus size={15} strokeWidth={2} style={{ color: 'var(--text-muted)' }} />
+            <span>Active Inspection</span>
           </div>
 
           <div
             className="font-mono"
             style={{
-              fontSize: '1.75rem',
-              lineHeight: '2.25rem',
+              fontSize: '1.5rem',
+              lineHeight: '1.75rem',
               fontWeight: 600,
               color: 'var(--text-primary)',
-              marginTop: 'var(--space-1)',
+              marginTop: '2px',
             }}
           >
             {event.billetId}
@@ -89,43 +93,42 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
 
         <div
           style={{
-            height: '48px',
-            padding: '0 20px',
+            height: '34px',
+            padding: '0 16px',
             borderRadius: 'var(--radius-control)',
             backgroundColor: verdictStyle.bg,
             color: verdictStyle.text,
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--space-2)',
-            fontSize: '1.25rem',
-            lineHeight: '1.75rem',
-            fontWeight: 600,
+            justifyContent: 'center',
+            fontSize: '0.9375rem',
+            fontWeight: 700,
+            fontFamily: 'var(--font-mono)',
             textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            boxShadow: '0 2px 4px rgba(15, 27, 45, 0.1)',
+            letterSpacing: '0.05em',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
             userSelect: 'none',
           }}
         >
-          <StatusIcon status={event.status} size={22} strokeWidth={2.2} />
-          <span>{verdictStyle.label}</span>
+          {verdictStyle.label}
         </div>
       </div>
 
       <div
         style={{
           display: 'flex',
-          gap: 'var(--space-6)',
+          gap: 'var(--space-5)',
           alignItems: 'stretch',
           flex: 1,
         }}
       >
         <div
           style={{
-            width: '40%',
-            minHeight: '220px',
+            width: '42%',
+            minHeight: '200px',
             borderRadius: 'var(--radius-control)',
             overflow: 'hidden',
-            backgroundColor: '#161d28',
+            backgroundColor: '#111822',
             position: 'relative',
             border: '1px solid var(--border)',
             display: 'flex',
@@ -140,21 +143,9 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
             preserveAspectRatio="xMidYMid slice"
             style={{ display: 'block' }}
           >
-            <defs>
-              <linearGradient id="billetFace" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#434e5f" />
-                <stop offset="40%" stopColor="#2e3846" />
-                <stop offset="100%" stopColor="#1e2530" />
-              </linearGradient>
-              <linearGradient id="billetShear" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#556275" />
-                <stop offset="100%" stopColor="#6b7a91" />
-              </linearGradient>
-            </defs>
-
             <rect width="300" height="240" fill="#111822" />
-            <polygon points="30,60 270,40 250,75 10,95" fill="url(#billetShear)" />
-            <rect x="10" y="95" width="240" height="110" rx="2" fill="url(#billetFace)" />
+            <polygon points="30,60 270,40 250,75 10,95" fill="#4B5668" />
+            <rect x="10" y="95" width="240" height="110" rx="2" fill="#2E3846" />
 
             <line x1="25" y1="110" x2="235" y2="110" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
             <line x1="25" y1="130" x2="235" y2="130" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
@@ -189,7 +180,7 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
 
         <div
           style={{
-            width: '60%',
+            width: '58%',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
@@ -197,33 +188,33 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
         >
           <div
             style={{
-              height: '44px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Billet ID</span>
-            <span className="font-mono" style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Billet ID</span>
+            <span className="font-mono" style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               {event.billetId}
             </span>
           </div>
 
           <div
             style={{
-              height: '44px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Length</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Length</span>
             <span
               className="tabular"
               style={{
-                fontSize: '1rem',
+                fontSize: '0.9375rem',
                 fontWeight: 500,
                 color: tolerances.lengthViolation ? 'var(--status-fail-text)' : 'var(--text-primary)',
                 display: 'flex',
@@ -231,27 +222,27 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
                 gap: '4px',
               }}
             >
-              {tolerances.lengthViolation && <AlertCircle size={16} />}
+              {tolerances.lengthViolation && <AlertCircle size={14} />}
               {formatDimension(event.lengthMm, true)}
             </span>
           </div>
 
           <div
             style={{
-              minHeight: '44px',
+              minHeight: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border)',
-              padding: tolerances.widthViolation ? '6px 0' : '0',
+              padding: tolerances.widthViolation ? '4px 0' : '0',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Width</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Width</span>
             <div style={{ textAlign: 'right' }}>
               <div
                 className="tabular"
                 style={{
-                  fontSize: '1rem',
+                  fontSize: '0.9375rem',
                   fontWeight: 500,
                   color: tolerances.widthViolation ? 'var(--status-fail-text)' : 'var(--text-primary)',
                   display: 'flex',
@@ -260,11 +251,11 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
                   gap: '4px',
                 }}
               >
-                {tolerances.widthViolation && <AlertCircle size={16} />}
+                {tolerances.widthViolation && <AlertCircle size={14} />}
                 {formatDimension(event.widthMm)}
               </div>
               {tolerances.widthViolation && (
-                <div style={{ fontSize: '0.8125rem', color: 'var(--status-fail-text)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--status-fail-text)' }}>
                   {tolerances.widthLimitText}
                 </div>
               )}
@@ -273,18 +264,18 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
 
           <div
             style={{
-              height: '44px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Height</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Height</span>
             <span
               className="tabular"
               style={{
-                fontSize: '1rem',
+                fontSize: '0.9375rem',
                 fontWeight: 500,
                 color: tolerances.heightViolation ? 'var(--status-fail-text)' : 'var(--text-primary)',
                 display: 'flex',
@@ -292,24 +283,24 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
                 gap: '4px',
               }}
             >
-              {tolerances.heightViolation && <AlertCircle size={16} />}
+              {tolerances.heightViolation && <AlertCircle size={14} />}
               {formatDimension(event.heightMm)}
             </span>
           </div>
 
           <div
             style={{
-              height: '44px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderBottom: '1px solid var(--border)',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Defect</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Defect</span>
             <span
               style={{
-                fontSize: '1rem',
+                fontSize: '0.9375rem',
                 fontWeight: 500,
                 color: event.defect !== 'None' ? 'var(--text-primary)' : 'var(--text-secondary)',
               }}
@@ -320,17 +311,17 @@ export const CurrentInspection: React.FC<CurrentInspectionProps> = ({ event }) =
 
           <div
             style={{
-              height: '44px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
             }}
           >
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Confidence</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Confidence</span>
             <span
               className="tabular"
               style={{
-                fontSize: '1rem',
+                fontSize: '0.9375rem',
                 fontWeight: 500,
                 color: tolerances.confidenceViolation ? 'var(--status-review-text)' : 'var(--text-primary)',
               }}

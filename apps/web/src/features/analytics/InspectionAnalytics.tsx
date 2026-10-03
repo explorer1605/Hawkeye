@@ -94,13 +94,13 @@ export const InspectionAnalytics: React.FC<InspectionAnalyticsProps> = ({
             value={range}
             onChange={(e) => handleRangeChange(e.target.value)}
             style={{
-              height: '40px',
-              padding: '0 36px 0 16px',
+              height: '34px',
+              padding: '0 32px 0 12px',
               borderRadius: 'var(--radius-control)',
               border: '1px solid var(--border-strong)',
               backgroundColor: 'var(--surface-card)',
               color: 'var(--text-primary)',
-              fontSize: '0.875rem',
+              fontSize: '0.8125rem',
               fontWeight: 500,
               cursor: 'pointer',
               appearance: 'none',
