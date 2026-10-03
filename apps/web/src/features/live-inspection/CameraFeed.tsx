@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, Play, Pause, AlertTriangle } from 'lucide-react';
+import { Camera, Play, Pause, VideoOff, RefreshCw } from 'lucide-react';
 import type { InspectionEvent, InspectionStatus } from '@hawkeye/shared';
-import { simulationEngine } from '@/lib/realtime/simulation-engine';
 
 interface CameraFeedProps {
   currentEvent: InspectionEvent;
   fps?: number;
 }
+
+type CameraState = 'initializing' | 'active' | 'paused' | 'error' | 'denied';
 
 const OVERLAY_COLORS: Record<InspectionStatus, string> = {
   PASS: '#3DDC84',
@@ -16,213 +17,311 @@ const OVERLAY_COLORS: Record<InspectionStatus, string> = {
 };
 
 export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animRef = useRef<number | null>(null);
+
+  const [cameraState, setCameraState] = useState<CameraState>('initializing');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [showControls, setShowControls] = useState<boolean>(false);
 
-  const animRef = useRef<number | null>(null);
-  const rollerOffsetRef = useRef<number>(0);
+  // Start the webcam
+  const startCamera = useCallback(async () => {
+    setCameraState('initializing');
+    setErrorMessage('');
 
-  const renderFrame = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    try {
+      // Stop any existing stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          facingMode: 'environment',
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraState('active');
+      }
+    } catch (err: unknown) {
+      const error = err as DOMException;
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setCameraState('denied');
+        setErrorMessage('Camera access was denied. Please allow camera permissions in your browser settings.');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        setCameraState('error');
+        setErrorMessage('No camera found. Please connect a camera and try again.');
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        setCameraState('error');
+        setErrorMessage('Camera is in use by another application. Please close it and retry.');
+      } else {
+        setCameraState('error');
+        setErrorMessage(`Camera error: ${error.message || 'Unknown error'}`);
+      }
+    }
+  }, []);
+
+  // Initialize camera on mount
+  useEffect(() => {
+    startCamera();
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current);
+      }
+    };
+  }, [startCamera]);
+
+  // Draw bounding box overlay on the canvas
+  const renderOverlay = useCallback(() => {
+    const canvas = overlayCanvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Match canvas size to its display size
+    const rect = canvas.getBoundingClientRect();
+    if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
 
     const w = canvas.width;
     const h = canvas.height;
 
-    if (isPlaying) {
-      rollerOffsetRef.current = (rollerOffsetRef.current + 1.2) % 40;
-    }
+    ctx.clearRect(0, 0, w, h);
 
-    ctx.fillStyle = '#0a101c';
-    ctx.fillRect(0, 0, w, h);
+    // Draw bounding box from inspection event
+    if (currentEvent.boundingBox) {
+      const overlayColor = OVERLAY_COLORS[currentEvent.status] || '#3DDC84';
+      const bb = currentEvent.boundingBox;
 
-    ctx.fillStyle = '#111928';
-    ctx.fillRect(0, 0, w, h * 0.4);
+      const boxX = bb.x * w;
+      const boxY = bb.y * h;
+      const boxW = bb.width * w;
+      const boxH = bb.height * h;
 
-    ctx.fillStyle = '#b8860b';
-    ctx.fillRect(0, h * 0.28, w, h * 0.04);
-    ctx.fillStyle = '#8b6508';
-    ctx.fillRect(0, h * 0.32, w, h * 0.015);
+      // Semi-transparent fill inside bounding box
+      ctx.fillStyle =
+        currentEvent.status === 'PASS'
+          ? 'rgba(61, 220, 132, 0.06)'
+          : currentEvent.status === 'FAIL'
+            ? 'rgba(255, 107, 99, 0.10)'
+            : currentEvent.status === 'REWORK'
+              ? 'rgba(255, 185, 56, 0.08)'
+              : 'rgba(107, 176, 255, 0.08)';
+      ctx.fillRect(boxX, boxY, boxW, boxH);
 
-    const bedTop = h * 0.38;
-    const bedHeight = h * 0.58;
+      // Bounding box border
+      ctx.strokeStyle = overlayColor;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-    ctx.fillStyle = '#161c28';
-    ctx.fillRect(0, bedTop, w, bedHeight);
+      // Corner accents
+      const cornerLen = Math.min(boxW, boxH) * 0.12;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = overlayColor;
 
-    const rollerSpacing = w * 0.085;
-    const rollerY = bedTop + h * 0.35;
-    const rollerRadius = h * 0.08;
-
-    for (let x = -rollerSpacing; x < w + rollerSpacing; x += rollerSpacing) {
-      const rx = x + (rollerOffsetRef.current / 40) * rollerSpacing;
-
-      ctx.fillStyle = '#0d131f';
+      // Top-left
       ctx.beginPath();
-      ctx.ellipse(rx, rollerY + 12, rollerSpacing * 0.42, rollerRadius * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      const rollerGrad = ctx.createLinearGradient(rx - rollerSpacing * 0.4, 0, rx + rollerSpacing * 0.4, 0);
-      rollerGrad.addColorStop(0, '#2c3340');
-      rollerGrad.addColorStop(0.3, '#525b6c');
-      rollerGrad.addColorStop(0.5, '#7b879c');
-      rollerGrad.addColorStop(0.7, '#414856');
-      rollerGrad.addColorStop(1, '#1e2430');
-
-      ctx.fillStyle = rollerGrad;
-      ctx.beginPath();
-      ctx.ellipse(rx, rollerY, rollerSpacing * 0.4, rollerRadius * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#1a1f2c';
-      ctx.beginPath();
-      ctx.arc(rx, rollerY, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const bgBillet1X = w * 0.03;
-    const bgBillet1Y = h * 0.38;
-    const bgBillet1W = w * 0.16;
-    const bgBillet1H = h * 0.28;
-
-    ctx.fillStyle = '#3a414e';
-    ctx.fillRect(bgBillet1X, bgBillet1Y, bgBillet1W, bgBillet1H);
-    ctx.fillStyle = '#4f5767';
-    ctx.fillRect(bgBillet1X + 4, bgBillet1Y + 4, bgBillet1W - 8, bgBillet1H * 0.3);
-
-    const bgBillet2X = w * 0.72;
-    const bgBillet2Y = h * 0.25;
-    const bgBillet2W = w * 0.24;
-    const bgBillet2H = h * 0.25;
-
-    ctx.fillStyle = '#323945';
-    ctx.fillRect(bgBillet2X, bgBillet2Y, bgBillet2W, bgBillet2H);
-    ctx.fillStyle = '#454c5b';
-    ctx.fillRect(bgBillet2X + 4, bgBillet2Y + 4, bgBillet2W - 8, bgBillet2H * 0.35);
-
-    const bx = w * 0.21;
-    const by = h * 0.26;
-    const bw = w * 0.48;
-    const bh = h * 0.34;
-
-    ctx.fillStyle = '#596478';
-    ctx.beginPath();
-    ctx.moveTo(bx + 16, by);
-    ctx.lineTo(bx + bw + 24, by - 24);
-    ctx.lineTo(bx + bw, by);
-    ctx.lineTo(bx, by + 18);
-    ctx.closePath();
-    ctx.fill();
-
-    const sideGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
-    sideGrad.addColorStop(0, '#4b5568');
-    sideGrad.addColorStop(0.4, '#394151');
-    sideGrad.addColorStop(1, '#232936');
-    ctx.fillStyle = sideGrad;
-    ctx.fillRect(bx, by + 18, bw, bh);
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
-      const lineY = by + 28 + i * 16;
-      ctx.beginPath();
-      ctx.moveTo(bx + 10, lineY);
-      ctx.lineTo(bx + bw - 15, lineY);
+      ctx.moveTo(boxX, boxY + cornerLen);
+      ctx.lineTo(boxX, boxY);
+      ctx.lineTo(boxX + cornerLen, boxY);
       ctx.stroke();
+
+      // Top-right
+      ctx.beginPath();
+      ctx.moveTo(boxX + boxW - cornerLen, boxY);
+      ctx.lineTo(boxX + boxW, boxY);
+      ctx.lineTo(boxX + boxW, boxY + cornerLen);
+      ctx.stroke();
+
+      // Bottom-left
+      ctx.beginPath();
+      ctx.moveTo(boxX, boxY + boxH - cornerLen);
+      ctx.lineTo(boxX, boxY + boxH);
+      ctx.lineTo(boxX + cornerLen, boxY + boxH);
+      ctx.stroke();
+
+      // Bottom-right
+      ctx.beginPath();
+      ctx.moveTo(boxX + boxW - cornerLen, boxY + boxH);
+      ctx.lineTo(boxX + boxW, boxY + boxH);
+      ctx.lineTo(boxX + boxW, boxY + boxH - cornerLen);
+      ctx.stroke();
+
+      // Status chip above bounding box
+      const chipText = `${currentEvent.billetId}  ${currentEvent.status}`;
+      ctx.font = '600 13px "IBM Plex Mono", monospace';
+      const textMetrics = ctx.measureText(chipText);
+      const chipPadX = 10;
+      const chipW = textMetrics.width + chipPadX * 2;
+      const chipH = 24;
+      const chipX = boxX;
+      const chipY = boxY - chipH - 4;
+
+      // Chip background
+      ctx.fillStyle = overlayColor;
+      ctx.beginPath();
+      ctx.roundRect(chipX, chipY, chipW, chipH, 4);
+      ctx.fill();
+
+      // Chip text
+      ctx.fillStyle = '#0A101C';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(chipText, chipX + chipPadX, chipY + chipH / 2);
     }
+  }, [currentEvent]);
 
-    ctx.save();
-    ctx.font = 'bold 26px "IBM Plex Mono", monospace';
-    ctx.fillStyle = 'rgba(225, 235, 245, 0.75)';
-    ctx.fillText(currentEvent.billetId, bx + bw * 0.22, by + bh * 0.58);
-    ctx.restore();
-
-    if (currentEvent.status !== 'PASS') {
-      if (currentEvent.defectCategory === 'Crack') {
-        ctx.strokeStyle = '#ffb938';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(bx + bw * 0.55, by + bh * 0.3);
-        ctx.lineTo(bx + bw * 0.58, by + bh * 0.45);
-        ctx.lineTo(bx + bw * 0.56, by + bh * 0.6);
-        ctx.lineTo(bx + bw * 0.61, by + bh * 0.78);
-        ctx.stroke();
-      } else if (currentEvent.defectCategory === 'Scratch') {
-        ctx.strokeStyle = '#ffb938';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(bx + bw * 0.15, by + bh * 0.7);
-        ctx.lineTo(bx + bw * 0.4, by + bh * 0.75);
-        ctx.stroke();
-      }
-    }
-
-    const vigGrad = ctx.createRadialGradient(w * 0.48, h * 0.5, w * 0.2, w * 0.5, h * 0.5, w * 0.7);
-    vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vigGrad.addColorStop(1, 'rgba(5, 10, 18, 0.5)');
-    ctx.fillStyle = vigGrad;
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.save();
-    ctx.strokeStyle = 'rgba(61, 220, 132, 0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(bgBillet2X - 4, bgBillet2Y - 14, bgBillet2W + 8, bgBillet2H + 24);
-    ctx.strokeRect(bgBillet1X - 2, bgBillet1Y - 8, bgBillet1W + 4, bgBillet1H + 16);
-    ctx.restore();
-
-    const overlayColor = OVERLAY_COLORS[currentEvent.status] || '#3DDC84';
-    const boxX = bx - 6;
-    const boxY = by - 8;
-    const boxW = bw + 14;
-    const boxH = bh + 32;
-
-    ctx.save();
-    ctx.strokeStyle = overlayColor;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
-
-    const chipText = `${currentEvent.billetId}  ${currentEvent.status}`;
-    ctx.font = '600 14px "IBM Plex Mono", monospace';
-    const textMetrics = ctx.measureText(chipText);
-    const chipPadX = 10;
-    const chipPadY = 6;
-    const chipW = textMetrics.width + chipPadX * 2;
-    const chipH = 26;
-    const chipX = boxX;
-    const chipY = boxY - chipH + 2;
-
-    ctx.fillStyle = overlayColor;
-    ctx.beginPath();
-    ctx.roundRect(chipX, chipY, chipW, chipH, 6);
-    ctx.fill();
-
-    ctx.fillStyle = '#0A101C';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(chipText, chipX + chipPadX, chipY + chipH / 2);
-    ctx.restore();
-  }, [currentEvent, isPlaying]);
-
+  // Overlay animation loop
   useEffect(() => {
+    if (cameraState !== 'active' && cameraState !== 'paused') return;
+
     let active = true;
     const loop = () => {
       if (!active) return;
-      renderFrame();
+      renderOverlay();
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
+
     return () => {
       active = false;
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [renderFrame]);
+  }, [renderOverlay, cameraState]);
 
-  const handleTogglePlay = () => {
-    const nextState = simulationEngine.togglePlay();
-    setIsPlaying(nextState);
+  // Play/Pause toggle
+  const handleTogglePlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !streamRef.current) return;
+
+    if (cameraState === 'active') {
+      video.pause();
+      setCameraState('paused');
+    } else if (cameraState === 'paused') {
+      video.play();
+      setCameraState('active');
+    }
+  }, [cameraState]);
+
+  // Render error/loading states
+  const renderFallbackState = () => {
+    const isError = cameraState === 'error' || cameraState === 'denied';
+    const isLoading = cameraState === 'initializing';
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '16px',
+          backgroundColor: '#0a101c',
+          zIndex: 5,
+        }}
+      >
+        {isLoading && (
+          <>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                border: '3px solid rgba(255, 255, 255, 0.1)',
+                borderTopColor: 'var(--overlay-pass)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }}
+            />
+            <span
+              style={{
+                color: 'var(--text-on-dark-muted)',
+                fontSize: '0.9375rem',
+                fontWeight: 500,
+              }}
+            >
+              Connecting to camera…
+            </span>
+          </>
+        )}
+
+        {isError && (
+          <>
+            <VideoOff size={48} strokeWidth={1.25} color="var(--text-on-dark-muted)" />
+            <span
+              style={{
+                color: '#FFFFFF',
+                fontSize: '1rem',
+                fontWeight: 600,
+                textAlign: 'center',
+                maxWidth: '360px',
+              }}
+            >
+              Camera unavailable
+            </span>
+            <span
+              style={{
+                color: 'var(--text-on-dark-muted)',
+                fontSize: '0.875rem',
+                textAlign: 'center',
+                maxWidth: '360px',
+                lineHeight: 1.5,
+              }}
+            >
+              {errorMessage}
+            </span>
+            <button
+              onClick={startCamera}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '8px',
+                padding: '8px 20px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#FFFFFF',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.18)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)')
+              }
+            >
+              <RefreshCw size={16} />
+              <span>Retry</span>
+            </button>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -240,18 +339,37 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
-      <canvas
-        ref={canvasRef}
-        width={960}
-        height={540}
+      {/* Live video element */}
+      <video
+        ref={videoRef}
+        muted
+        playsInline
         style={{
           width: '100%',
           height: '100%',
           display: 'block',
-          objectFit: 'contain',
+          objectFit: 'cover',
         }}
       />
 
+      {/* Transparent canvas overlay for bounding boxes */}
+      <canvas
+        ref={overlayCanvasRef}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 2,
+        }}
+      />
+
+      {/* Fallback states (loading / error) */}
+      {(cameraState === 'initializing' || cameraState === 'error' || cameraState === 'denied') &&
+        renderFallbackState()}
+
+      {/* Top header bar */}
       <div
         style={{
           position: 'absolute',
@@ -302,44 +420,43 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
                 width: '7px',
                 height: '7px',
                 borderRadius: '50%',
-                backgroundColor: isPlaying ? 'var(--overlay-pass)' : 'var(--text-muted)',
+                backgroundColor:
+                  cameraState === 'active'
+                    ? 'var(--overlay-pass)'
+                    : cameraState === 'paused'
+                      ? 'var(--overlay-rework)'
+                      : 'var(--text-muted)',
+                transition: 'background-color 0.2s ease',
               }}
             />
-            <span>{isPlaying ? 'LIVE' : 'PAUSED'}</span>
+            <span>
+              {cameraState === 'active'
+                ? 'LIVE'
+                : cameraState === 'paused'
+                  ? 'PAUSED'
+                  : cameraState === 'initializing'
+                    ? 'CONNECTING'
+                    : 'OFFLINE'}
+            </span>
           </div>
 
-          <div
-            className="tabular"
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'var(--text-on-dark-muted)',
-            }}
-          >
-            FPS: {isPlaying ? fps : 0}
-          </div>
+          {(cameraState === 'active' || cameraState === 'paused') && (
+            <div
+              className="tabular"
+              style={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'var(--text-on-dark-muted)',
+              }}
+            >
+              FPS: {cameraState === 'active' ? fps : 0}
+            </div>
+          )}
         </div>
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          bottom: '16px',
-          left: '16px',
-          padding: '4px 10px',
-          borderRadius: 'var(--radius-control)',
-          backgroundColor: 'rgba(10, 16, 28, 0.72)',
-          color: 'var(--text-on-dark-muted)',
-          fontSize: '0.8125rem',
-          fontWeight: 500,
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }}
-      >
-        Simulated feed
-      </div>
-
-      {showControls && (
+      {/* Play/Pause controls — visible on hover */}
+      {showControls && (cameraState === 'active' || cameraState === 'paused') && (
         <div
           style={{
             position: 'absolute',
@@ -367,33 +484,23 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               color: '#FFFFFF',
               fontSize: '0.8125rem',
               fontWeight: 500,
+              border: 'none',
+              cursor: 'pointer',
             }}
-            title={isPlaying ? 'Pause Feed' : 'Resume Feed'}
+            title={cameraState === 'active' ? 'Pause Feed' : 'Resume Feed'}
           >
-            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-            <span>{isPlaying ? 'Pause' : 'Resume'}</span>
-          </button>
-
-          <button
-            onClick={() => simulationEngine.triggerManualInspection('crack')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-control)',
-              backgroundColor: 'rgba(242, 163, 58, 0.25)',
-              color: 'var(--overlay-rework)',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-            }}
-            title="Inject simulated crack defect"
-          >
-            <AlertTriangle size={14} />
-            <span>Simulate Defect</span>
+            {cameraState === 'active' ? <Pause size={14} /> : <Play size={14} />}
+            <span>{cameraState === 'active' ? 'Pause' : 'Resume'}</span>
           </button>
         </div>
       )}
+
+      {/* CSS keyframes for spinner */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
