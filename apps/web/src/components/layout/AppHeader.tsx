@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Video, BarChart2, FileText, Radio } from 'lucide-react';
 import { formatDateTime } from '@/lib/format';
+import logoImg from '@/assets/logo.png';
 
 export type NavTab = 'live' | 'analytics' | 'log';
 
@@ -25,21 +25,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
+  const navItems: { id: NavTab; label: string }[] = [
     {
       id: 'live',
       label: 'Live inspection',
-      icon: <Video size={20} strokeWidth={1.75} />,
     },
     {
       id: 'analytics',
       label: 'Analytics',
-      icon: <BarChart2 size={20} strokeWidth={1.75} />,
     },
     {
       id: 'log',
       label: 'Inspection log',
-      icon: <FileText size={20} strokeWidth={1.75} />,
     },
   ];
 
@@ -49,9 +46,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         position: 'sticky',
         top: 0,
         zIndex: 50,
-        height: '72px',
+        height: '62px',
         backgroundColor: 'var(--surface-header)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: '1px solid #1E2D44',
         display: 'flex',
         alignItems: 'center',
       }}
@@ -65,52 +62,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-6)' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <img
+              src={logoImg}
+              alt="Hawkeye"
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-control)',
-                backgroundColor: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#FFFFFF',
-                boxShadow: '0 2px 8px rgba(47, 111, 237, 0.3)',
+                height: '30px',
+                width: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+                mixBlendMode: 'screen',
               }}
-            >
-              <Radio size={22} strokeWidth={2.2} />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: '1.375rem',
-                  lineHeight: '1.75rem',
-                  fontWeight: 600,
-                  color: 'var(--text-on-dark)',
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Hawkeye
-              </div>
-              <div
-                style={{
-                  fontSize: '0.875rem',
-                  lineHeight: '1.25rem',
-                  color: 'var(--text-on-dark-muted)',
-                }}
-              >
-                Automated inspection system
-              </div>
-            </div>
+            />
           </div>
 
           <nav
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-2)',
+              gap: '4px',
             }}
             aria-label="Main Navigation"
           >
@@ -125,23 +96,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    height: '44px',
-                    padding: '0 16px',
+                    justifyContent: 'center',
+                    height: '36px',
+                    padding: '0 14px',
                     borderRadius: 'var(--radius-control)',
                     backgroundColor: isActive
                       ? 'var(--surface-header-active)'
                       : 'transparent',
                     color: isActive ? 'var(--text-on-dark)' : 'var(--text-on-dark-muted)',
-                    fontSize: '1rem',
-                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                    fontWeight: isActive ? 600 : 500,
+                    letterSpacing: '0.01em',
                     transition: 'all 150ms ease-out',
                     border: 'none',
                     outline: 'none',
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                      e.currentTarget.style.backgroundColor = '#18283E';
                       e.currentTarget.style.color = 'var(--text-on-dark)';
                     }
                   }}
@@ -152,15 +124,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     }
                   }}
                 >
-                  {item.icon}
                   <span>{item.label}</span>
                   {isActive && (
                     <div
                       style={{
                         position: 'absolute',
                         bottom: '0',
-                        left: '16px',
-                        right: '16px',
+                        left: '12px',
+                        right: '12px',
                         height: '2px',
                         backgroundColor: '#4C8DFF',
                         borderRadius: '1px',
@@ -177,49 +148,44 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--space-6)',
+            gap: 'var(--space-5)',
           }}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-2)',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              color: 'var(--text-on-dark)',
+              justifyContent: 'center',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.04em',
+              color:
+                systemStatus === 'online'
+                  ? 'var(--overlay-pass)'
+                  : systemStatus === 'reconnecting'
+                  ? 'var(--overlay-rework)'
+                  : 'var(--overlay-fail)',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-control)',
             }}
           >
-            <div
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor:
-                  systemStatus === 'online'
-                    ? 'var(--overlay-pass)'
-                    : systemStatus === 'reconnecting'
-                    ? 'var(--overlay-rework)'
-                    : 'var(--overlay-fail)',
-              }}
-            />
-            <span>
-              {systemStatus === 'online'
-                ? 'System online'
-                : systemStatus === 'reconnecting'
-                ? 'Reconnecting…'
-                : 'Offline'}
-            </span>
+            {systemStatus === 'online'
+              ? 'ONLINE'
+              : systemStatus === 'reconnecting'
+              ? 'RECONNECTING'
+              : 'OFFLINE'}
           </div>
 
           <div
             className="tabular"
             style={{
-              fontSize: '0.875rem',
-              lineHeight: '1.25rem',
+              fontSize: '0.8125rem',
               color: 'var(--text-on-dark-muted)',
-              fontFamily: 'var(--font-ui)',
-              letterSpacing: '0.01em',
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.02em',
             }}
           >
             {formatDateTime(currentTime)}

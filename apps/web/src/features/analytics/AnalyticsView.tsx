@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   BarChart2,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle2,
   PieChart,
-  Layers,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import type { InspectionEvent } from '@hawkeye/shared';
 
@@ -27,91 +27,203 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 'var(--space-6)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 'var(--space-5)',
         }}
       >
-        <div className="bv-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Total Inspected</span>
-            <Layers size={18} style={{ color: 'var(--text-muted)' }} />
-          </div>
+        <div className="bv-card" style={{ padding: 'var(--space-4) var(--space-5)' }}>
           <div
-            className="tabular"
             style={{
-              fontSize: '1.75rem',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              marginTop: 'var(--space-2)',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              marginBottom: 'var(--space-2)',
             }}
           >
-            {total.toLocaleString()}
+            Total Inspected
           </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Continuous production line
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              className="tabular"
+              style={{
+                fontSize: '1.75rem',
+                lineHeight: 1.2,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {total.toLocaleString()}
+            </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-secondary)',
+                backgroundColor: 'var(--surface-sunken)',
+                border: '1px solid var(--border)',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-control)',
+              }}
+            >
+              +12 today
+            </span>
           </div>
         </div>
 
-        <div className="bv-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>First-Pass Yield</span>
-            <CheckCircle2 size={18} style={{ color: 'var(--status-pass)' }} />
-          </div>
+        <div className="bv-card" style={{ padding: 'var(--space-4) var(--space-5)' }}>
           <div
-            className="tabular"
             style={{
-              fontSize: '1.75rem',
-              fontWeight: 600,
-              color: 'var(--status-pass-text)',
-              marginTop: 'var(--space-2)',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              marginBottom: 'var(--space-2)',
             }}
           >
-            {yieldRate}%
+            First-pass Yield
           </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Target: ≥ 92.0%
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              className="tabular"
+              style={{
+                fontSize: '1.75rem',
+                lineHeight: 1.2,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {yieldRate}%
+            </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--status-pass-text)',
+                backgroundColor: 'var(--status-pass-bg)',
+                border: '1px solid rgba(20, 122, 69, 0.25)',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-control)',
+              }}
+            >
+              +2.1%
+            </span>
           </div>
         </div>
 
-        <div className="bv-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Defect & Rework</span>
-            <AlertTriangle size={18} style={{ color: 'var(--status-fail)' }} />
-          </div>
+        <div className="bv-card" style={{ padding: 'var(--space-4) var(--space-5)' }}>
           <div
-            className="tabular"
             style={{
-              fontSize: '1.75rem',
-              fontWeight: 600,
-              color: 'var(--status-fail-text)',
-              marginTop: 'var(--space-2)',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              marginBottom: 'var(--space-2)',
             }}
           >
-            {failRate}%
+            Defect & Rework Rate
           </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {fails} Fails, {reworks} Reworks
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              className="tabular"
+              style={{
+                fontSize: '1.75rem',
+                lineHeight: 1.2,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {failRate}%
+            </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-secondary)',
+                backgroundColor: 'var(--surface-sunken)',
+                border: '1px solid var(--border)',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-control)',
+              }}
+            >
+              -0.8% week
+            </span>
           </div>
         </div>
 
-        <div className="bv-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Width CpK Index</span>
-            <TrendingUp size={18} style={{ color: 'var(--accent)' }} />
-          </div>
+        <div className="bv-card" style={{ padding: 'var(--space-4) var(--space-5)' }}>
           <div
-            className="tabular"
             style={{
-              fontSize: '1.75rem',
-              fontWeight: 600,
-              color: 'var(--accent)',
-              marginTop: 'var(--space-2)',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              marginBottom: 'var(--space-2)',
             }}
           >
-            1.48
+            Width CpK Index
           </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Process capability stable
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 'var(--space-3)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              className="tabular"
+              style={{
+                fontSize: '1.75rem',
+                lineHeight: 1.2,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}
+            >
+              1.48
+            </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--status-pass-text)',
+                backgroundColor: 'var(--status-pass-bg)',
+                border: '1px solid rgba(20, 122, 69, 0.25)',
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-control)',
+              }}
+            >
+              &gt;1.33 Nominal
+            </span>
           </div>
         </div>
       </div>
@@ -126,13 +238,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
         <div className="bv-card">
           <div className="bv-card-header">
             <div className="bv-card-title">
-              <BarChart2 size={20} strokeWidth={1.75} />
+              <BarChart2 size={18} strokeWidth={1.75} />
               <span>Billet Width Distribution (mm)</span>
             </div>
-            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Nominal: 150.0 ± 2.0 mm</span>
+            <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>Nominal: 150.0 ± 2.0 mm</span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px 0' }}>
             {[
               { bin: '< 148.0 (Undersize)', count: 2, pct: 2, color: 'var(--status-fail)' },
               { bin: '148.0 – 148.9 mm', count: 18, pct: 15, color: 'var(--accent)' },
@@ -142,15 +254,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
               { bin: '> 152.0 (Oversize)', count: 4, pct: 3, color: 'var(--status-fail)' },
             ].map((b) => (
               <div key={b.bin} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ width: '160px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                <span style={{ width: '160px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   {b.bin}
                 </span>
                 <div
                   style={{
                     flex: 1,
-                    height: '24px',
+                    height: '20px',
                     backgroundColor: 'var(--surface-sunken)',
-                    borderRadius: 'var(--radius-control)',
+                    borderRadius: '2px',
                     overflow: 'hidden',
                   }}
                 >
@@ -159,11 +271,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
                       height: '100%',
                       width: `${b.pct * 2.2}%`,
                       backgroundColor: b.color,
-                      borderRadius: 'var(--radius-control)',
+                      borderRadius: '2px',
                     }}
                   />
                 </div>
-                <span className="tabular" style={{ width: '60px', textAlign: 'right', fontSize: '0.875rem', fontWeight: 500 }}>
+                <span className="tabular" style={{ width: '60px', textAlign: 'right', fontSize: '0.8125rem', fontWeight: 500 }}>
                   {b.count} ({b.pct}%)
                 </span>
               </div>
@@ -174,12 +286,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
         <div className="bv-card">
           <div className="bv-card-header">
             <div className="bv-card-title">
-              <PieChart size={20} strokeWidth={1.75} />
+              <PieChart size={18} strokeWidth={1.75} />
               <span>Defect Classifications</span>
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
               { type: 'Longitudinal Crack', category: 'Crack', count: 45, action: 'Rework grinding', color: 'var(--cat-1)' },
               { type: 'Surface Scratch', category: 'Scratch', count: 30, action: 'Roller polishing', color: 'var(--cat-2)' },
@@ -192,23 +304,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ events }) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '12px',
+                  padding: '10px 14px',
                   backgroundColor: 'var(--surface-sunken)',
+                  border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-control)',
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '2px', backgroundColor: d.color }} />
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {d.type}
-                    </span>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {d.type}
                   </div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                     Standard protocol: {d.action}
                   </div>
                 </div>
-                <span className="tabular" style={{ fontSize: '1.125rem', fontWeight: 600 }}>
+                <span className="tabular" style={{ fontSize: '1rem', fontWeight: 600 }}>
                   {d.count}
                 </span>
               </div>

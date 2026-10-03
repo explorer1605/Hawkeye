@@ -10,28 +10,6 @@ interface LiveAlertsProps {
   onViewAll?: () => void;
 }
 
-const ICON_CIRCLE_STYLES: Record<
-  InspectionStatus,
-  { bg: string; color: string }
-> = {
-  PASS: {
-    bg: 'var(--status-pass-bg)',
-    color: 'var(--status-pass-text)',
-  },
-  FAIL: {
-    bg: 'var(--status-fail-bg)',
-    color: 'var(--status-fail-text)',
-  },
-  REWORK: {
-    bg: 'var(--status-rework-bg)',
-    color: 'var(--status-rework-text)',
-  },
-  REVIEW: {
-    bg: 'var(--status-review-bg)',
-    color: 'var(--status-review-text)',
-  },
-};
-
 export const LiveAlerts: React.FC<LiveAlertsProps> = ({ alerts, onViewAll }) => {
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set());
 
@@ -46,7 +24,7 @@ export const LiveAlerts: React.FC<LiveAlertsProps> = ({ alerts, onViewAll }) => 
             next.delete(latestId);
             return next;
           });
-        }, 6000);
+        }, 3000);
         return () => clearTimeout(timer);
       }
     }
@@ -107,97 +85,96 @@ export const LiveAlerts: React.FC<LiveAlertsProps> = ({ alerts, onViewAll }) => 
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text-muted)',
-              fontSize: '0.875rem',
-              padding: 'var(--space-8) 0',
+              fontSize: '0.8125rem',
+              padding: 'var(--space-6) 0',
             }}
           >
             No active alerts. All systems running within tolerance.
           </div>
         ) : (
-          displayAlerts.map((alert, idx) => {
-            const circleStyle = ICON_CIRCLE_STYLES[alert.status];
-            const isHighlighted = highlightedIds.has(alert.id);
-            const isLast = idx === displayAlerts.length - 1;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {displayAlerts.map((alert) => {
+              const isHighlighted = highlightedIds.has(alert.id);
 
-            return (
-              <div
-                key={alert.id}
-                style={{
-                  minHeight: '72px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-4)',
-                  padding: 'var(--space-3) 0',
-                  borderBottom: isLast ? 'none' : '1px solid var(--border)',
-                  backgroundColor: isHighlighted ? circleStyle.bg : 'transparent',
-                  transition: 'background-color 1.5s ease-out',
-                  borderRadius: isHighlighted ? 'var(--radius-control)' : '0',
-                }}
-              >
+              return (
                 <div
+                  key={alert.id}
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    minWidth: '36px',
-                    borderRadius: '50%',
-                    backgroundColor: circleStyle.bg,
-                    color: circleStyle.color,
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    gap: 'var(--space-3)',
+                    padding: '10px 14px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: isHighlighted ? 'var(--surface-sunken)' : 'var(--surface-card)',
+                    borderRadius: 'var(--radius-control)',
+                    transition: 'background-color 1s ease-out',
                   }}
                 >
-                  <StatusIcon status={alert.status} size={18} strokeWidth={2.2} />
-                </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.875rem',
+                          lineHeight: '1.25rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {alert.title}
+                      </span>
+                      <span
+                        className="font-mono"
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          padding: '1px 6px',
+                          backgroundColor: 'var(--surface-sunken)',
+                          borderRadius: '2px',
+                        }}
+                      >
+                        {alert.billetId}
+                      </span>
+                    </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--text-secondary)',
+                        marginTop: '2px',
+                      }}
+                    >
+                      {alert.detail}
+                    </div>
+                  </div>
+
                   <div
+                    className="tabular"
                     style={{
-                      fontSize: '1rem',
-                      lineHeight: '1.5rem',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
+                      fontSize: '0.75rem',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--text-muted)',
                       whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
                     }}
                   >
-                    {alert.title}
+                    {formatTime(alert.timestamp)}
                   </div>
 
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-4)',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.25rem',
-                      color: 'var(--text-secondary)',
-                      marginTop: '2px',
-                    }}
-                  >
-                    <span className="font-mono">Billet ID: {alert.billetId}</span>
-                    <span>{alert.detail}</span>
+                  <div>
+                    <StatusPill status={alert.status} />
                   </div>
                 </div>
-
-                <div
-                  className="tabular"
-                  style={{
-                    fontSize: '0.8125rem',
-                    color: 'var(--text-muted)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatTime(alert.timestamp)}
-                </div>
-
-                <div>
-                  <StatusPill status={alert.status} />
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

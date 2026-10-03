@@ -402,42 +402,33 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <div
             style={{
-              height: '28px',
-              padding: '0 12px',
-              borderRadius: 'var(--radius-pill)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              height: '24px',
+              padding: '0 8px',
+              borderRadius: 'var(--radius-control)',
+              backgroundColor: 'rgba(10, 16, 28, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-2)',
-              color: '#FFFFFF',
-              fontSize: '0.8125rem',
+              justifyContent: 'center',
+              color:
+                cameraState === 'active'
+                  ? 'var(--overlay-pass)'
+                  : cameraState === 'paused'
+                    ? 'var(--overlay-rework)'
+                    : 'var(--text-muted)',
+              fontSize: '0.75rem',
               fontWeight: 600,
-              letterSpacing: '0.04em',
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.06em',
             }}
           >
-            <div
-              style={{
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                backgroundColor:
-                  cameraState === 'active'
-                    ? 'var(--overlay-pass)'
-                    : cameraState === 'paused'
-                      ? 'var(--overlay-rework)'
-                      : 'var(--text-muted)',
-                transition: 'background-color 0.2s ease',
-              }}
-            />
-            <span>
-              {cameraState === 'active'
-                ? 'LIVE'
-                : cameraState === 'paused'
-                  ? 'PAUSED'
-                  : cameraState === 'initializing'
-                    ? 'CONNECTING'
-                    : 'OFFLINE'}
-            </span>
+            {cameraState === 'active'
+              ? 'LIVE'
+              : cameraState === 'paused'
+                ? 'PAUSED'
+                : cameraState === 'initializing'
+                  ? 'CONNECTING'
+                  : 'OFFLINE'}
           </div>
 
           {(cameraState === 'active' || cameraState === 'paused') && (

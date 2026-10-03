@@ -53,8 +53,8 @@ export const App: React.FC = () => {
       <main
         style={{
           flex: 1,
-          paddingTop: 'var(--space-6)',
-          paddingBottom: 'var(--space-10)',
+          paddingTop: 'var(--space-5)',
+          paddingBottom: 'var(--space-8)',
         }}
       >
         <div className="bv-container">
@@ -63,7 +63,7 @@ export const App: React.FC = () => {
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 'var(--space-6)',
+                gap: 'var(--space-5)',
               }}
             >
               <section
@@ -71,7 +71,7 @@ export const App: React.FC = () => {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(12, 1fr)',
-                  gap: 'var(--space-6)',
+                  gap: 'var(--space-5)',
                 }}
               >
                 <div style={{ gridColumn: 'span 7' }}>
@@ -87,7 +87,7 @@ export const App: React.FC = () => {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(12, 1fr)',
-                  gap: 'var(--space-6)',
+                  gap: 'var(--space-5)',
                 }}
               >
                 <div style={{ gridColumn: 'span 6' }}>
