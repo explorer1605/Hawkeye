@@ -1,0 +1,36 @@
+{
+  "goodbad": {
+    "0": "good",
+    "1": "not-good"
+  },
+  "defect_types": {
+    "0": "crack",
+    "1": "inclusion",
+    "2": "pinhole",
+    "3": "scale",
+    "4": "scratch"
+  },
+  "bad_name": "not-good",
+  "remedy": {
+    "crack": [
+      "Reject/Rework",
+      "Check depth: shallow -> scarf/grind, deep -> scrap. Review mould level, secondary cooling, casting speed."
+    ],
+    "scale": [
+      "Rework",
+      "Descale before rolling; check reheating furnace atmosphere and soak time."
+    ],
+    "pinhole": [
+      "Rework/Review",
+      "Grind/scarf if shallow; check deoxidation and mould powder moisture."
+    ],
+    "inclusion": [
+      "Review",
+      "Send sample for lab check; improve ladle/tundish cleanliness and slag control."
+    ],
+    "scratch": [
+      "Pass/Review",
+      "Usually cosmetic; check guide rollers and handling contact points."
+    ]
+  }
+}
