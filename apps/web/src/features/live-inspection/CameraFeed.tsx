@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, Play, Pause, VideoOff, RefreshCw, Focus, Sliders } from 'lucide-react';
+import React, { useRef, useEffect, useState, useCallback, MouseEvent } from 'react';
+import { Camera, Play, Pause, VideoOff, RefreshCw, Focus, Sliders, Target, Crop } from 'lucide-react';
 import type { InspectionEvent, InspectionStatus } from '@hawkeye/shared';
 
 interface CameraFeedProps {
@@ -25,8 +25,7 @@ const OVERLAY_COLORS: Record<InspectionStatus, string> = {
   REVIEW: '#6BB0FF',
 };
 
-const VISION_API_URL = 'http://localhost:8001';
-const VISION_WS_URL = 'ws://localhost:8001/ws';
+const VISION_API_URL = 'http://localhost:8003';
 
 export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -38,7 +37,6 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   const wsRef = useRef<WebSocket | null>(null);
 
   const [cameraState, setCameraState] = useState<CameraState>('initializing');
-  const [feedSource, setFeedSource] = useState<FeedSource>('browser');
   const [visionAvailable, setVisionAvailable] = useState<boolean>(false);
   const [liveGpuFps, setLiveGpuFps] = useState<number>(0);
   const [inferenceMs, setInferenceMs] = useState<number>(0);
@@ -57,6 +55,15 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   // Defect Detection State
   const [defectResult, setDefectResult] = useState<DefectInspectionResult | null>(null);
 
+  // OCR Detected Text State
+  const [detectedBilletId, setDetectedBilletId] = useState<string>('');
+  
+  // Custom ROI Draw State
+  const [isDrawingRoi, setIsDrawingRoi] = useState<boolean>(false);
+  const [roiStart, setRoiStart] = useState<{ x: number; y: number } | null>(null);
+  const [roiCurrent, setRoiCurrent] = useState<{ x: number; y: number } | null>(null);
+  const [customRoi, setCustomRoi] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+
   // Poll Python Vision Service periodically so we stay on USB camera
   useEffect(() => {
     let active = true;
@@ -67,19 +74,22 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         if (res.ok && active) {
           const data = await res.json();
           setVisionAvailable(true);
-          setFeedSource('vision');
           if (!isPaused) setCameraState('active');
           if (data.current_fps && !isPaused) setLiveGpuFps(data.current_fps);
           if (data.inference_ms && !isPaused) setInferenceMs(data.inference_ms);
-
-          // Stop browser camera tracks if they were running
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach((t) => t.stop());
-            streamRef.current = null;
+        } else {
+          if (active) {
+            setVisionAvailable(false);
+            setCameraState('error');
+            setErrorMessage('Decision engine is offline. Start it on port 8003.');
           }
         }
       } catch {
-        if (active) setVisionAvailable(false);
+        if (active) {
+          setVisionAvailable(false);
+          setCameraState('error');
+          setErrorMessage('Decision engine is offline. Start it on port 8003.');
+        }
       }
     };
 
@@ -95,53 +105,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   const isPausedRef = useRef<boolean>(false);
   isPausedRef.current = isPaused;
 
-  // Connect to Python WebSocket for 24+ FPS telemetry
-  useEffect(() => {
-    if (feedSource !== 'vision') {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      return;
-    }
 
-    let isMounted = true;
-    const connectWs = () => {
-      try {
-        const ws = new WebSocket(VISION_WS_URL);
-        wsRef.current = ws;
-
-        ws.onmessage = (event) => {
-          if (!isMounted || isPausedRef.current) return;
-          try {
-            const data = JSON.parse(event.data);
-            if (data.fps !== undefined) setLiveGpuFps(data.fps);
-            if (data.inference_ms !== undefined) setInferenceMs(data.inference_ms);
-          } catch {
-            // Ignore parse errors
-          }
-        };
-
-        ws.onclose = () => {
-          if (isMounted && feedSource === 'vision') {
-            setTimeout(connectWs, 2000);
-          }
-        };
-      } catch {
-        // Fallback retry
-      }
-    };
-
-    connectWs();
-
-    return () => {
-      isMounted = false;
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, [feedSource]);
 
   // Periodic Defect Inspection
   useEffect(() => {
@@ -155,12 +119,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     const runInspection = async () => {
       if (!active || isPausedRef.current || isInspecting) return;
       
-      let sourceElement: HTMLImageElement | HTMLVideoElement | null = null;
-      if (feedSource === 'vision') {
-        sourceElement = visionImgRef.current;
-      } else {
-        sourceElement = videoRef.current;
-      }
+      let sourceElement: HTMLImageElement | null = visionImgRef.current;
 
       if (!sourceElement) return;
 
@@ -178,9 +137,6 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         if (sourceElement instanceof HTMLImageElement) {
           width = sourceElement.naturalWidth || 1280;
           height = sourceElement.naturalHeight || 720;
-        } else if (sourceElement instanceof HTMLVideoElement) {
-          width = sourceElement.videoWidth || 1280;
-          height = sourceElement.videoHeight || 720;
         }
         
         if (width === 0 || height === 0) {
@@ -201,7 +157,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
           formData.append('file', blob, 'frame.jpg');
 
           try {
-            const res = await fetch('http://127.0.0.1:8000/inspect', {
+            const res = await fetch('http://127.0.0.1:8004/inspect', {
               method: 'POST',
               body: formData,
             });
@@ -227,7 +183,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       active = false;
       clearInterval(intervalId);
     };
-  }, [feedSource]);
+  }, []);
 
   // Focus Handlers for USB Camera
   const handleToggleAutoFocus = async (enabled: boolean) => {
@@ -236,6 +192,57 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       await fetch(`${VISION_API_URL}/camera/autofocus?enabled=${enabled}`, { method: 'POST' });
     } catch (e) {
       console.error('Failed to set autofocus:', e);
+    }
+  };
+
+  const handleCustomRoiComplete = async (x1: number, y1: number, x2: number, y2: number) => {
+    setCustomRoi({ x1, y1, x2, y2 });
+    setIsDrawingRoi(false);
+    setRoiStart(null);
+    setRoiCurrent(null);
+    
+    try {
+      await fetch(`${VISION_API_URL}/camera/roi_custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x1, y1, x2, y2 })
+      });
+    } catch (e) {
+      console.error('Failed to set custom ROI:', e);
+    }
+  };
+
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isDrawingRoi || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setRoiStart({ x, y });
+    setRoiCurrent({ x, y });
+  };
+
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (!isDrawingRoi || !roiStart || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setRoiCurrent({ x, y });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawingRoi || !roiStart || !roiCurrent) return;
+    
+    const x1 = Math.min(roiStart.x, roiCurrent.x);
+    const x2 = Math.max(roiStart.x, roiCurrent.x);
+    const y1 = Math.min(roiStart.y, roiCurrent.y);
+    const y2 = Math.max(roiStart.y, roiCurrent.y);
+    
+    // Ignore tiny accidental clicks
+    if (x2 - x1 > 0.05 && y2 - y1 > 0.05) {
+      handleCustomRoiComplete(x1, y1, x2, y2);
+    } else {
+      setRoiStart(null);
+      setRoiCurrent(null);
     }
   };
 
@@ -257,58 +264,69 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     }
   };
 
-  // Start the browser webcam (fallback mode)
-  const startBrowserWebcam = useCallback(async () => {
-    setFeedSource('browser');
-    setCameraState('initializing');
-    setErrorMessage('');
-
+  const handleCalibrate = async () => {
     try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
+      const promptText = customRoi
+        ? "Enter reference object width in millimeters (mm) for the selected ROI:"
+        : "Enter reference object width in millimeters (mm):\n(Tip: You can use 'Draw ROI' on the video to select the exact reference object before calibrating)";
+      
+      const refWidthStr = prompt(promptText, "150");
+      if (!refWidthStr) return;
+      
+      const refWidth = parseFloat(refWidthStr);
+      if (isNaN(refWidth) || refWidth <= 0) {
+        alert("Invalid input: Please enter a valid positive number for reference width in mm.");
+        return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          facingMode: 'environment',
-        },
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraState('active');
+      const payload: { reference_width_mm: number; roi?: typeof customRoi } = {
+        reference_width_mm: refWidth,
+      };
+      if (customRoi) {
+        payload.roi = customRoi;
       }
-    } catch (err: unknown) {
-      const error = err as DOMException;
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        setCameraState('denied');
-        setErrorMessage('Camera access was denied. Please allow camera permissions in your browser settings.');
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-        setCameraState('error');
-        setErrorMessage('No camera found. Please connect a camera and try again.');
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-        setCameraState('error');
-        setErrorMessage('Camera is in use by another application. Please close it and retry.');
+
+      let response: Response | null = null;
+      let errorDetails = '';
+
+      // Primary: connect directly to Vision API (decision engine on port 8003)
+      try {
+        response = await fetch(`${VISION_API_URL}/calibrate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (directErr) {
+        console.warn('Direct Vision API call failed, attempting backend proxy...', directErr);
+        // Fallback: try proxy via port 8000
+        try {
+          response = await fetch('http://localhost:8000/api/v1/calibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } catch (proxyErr) {
+          throw new Error(`Unable to reach Vision API at ${VISION_API_URL}. Please ensure the Decision Engine service is running.`);
+        }
+      }
+
+      if (!response) {
+        throw new Error('No response from calibration service.');
+      }
+
+      const data = await response.json().catch(() => null);
+
+      if (response.ok) {
+        alert(data?.message || `Camera calibrated successfully! PPM: ${data?.ppm?.toFixed(4) || 'active'}`);
       } else {
-        setCameraState('error');
-        setErrorMessage(`Camera error: ${error.message || 'Unknown error'}`);
+        errorDetails = data?.detail || data?.error || `Server responded with status ${response.status}`;
+        alert(`Calibration Notice:\n${errorDetails}`);
       }
+    } catch (e: any) {
+      console.error('Calibration error:', e);
+      alert(`Calibration Connection Error:\n${e.message || 'Failed to reach API.'}`);
     }
-  }, []);
-
-  // Auto-start browser webcam if set as default
-  useEffect(() => {
-    if (feedSource === 'browser' && cameraState === 'initializing') {
-      startBrowserWebcam();
-    }
-  }, [feedSource, cameraState, startBrowserWebcam]);
+  };
 
   // Cleanup camera stream on unmount
   useEffect(() => {
@@ -404,7 +422,8 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       ctx.stroke();
 
       // Status chip above bounding box
-      const chipText = `${currentEvent.billetId}  ${currentEvent.status}`;
+      const displayId = detectedBilletId || currentEvent.billetId;
+      const chipText = `${displayId}  ${currentEvent.status}`;
       ctx.font = '600 13px "IBM Plex Mono", monospace';
       const textMetrics = ctx.measureText(chipText);
       const chipPadX = 10;
@@ -424,7 +443,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
       ctx.textBaseline = 'middle';
       ctx.fillText(chipText, chipX + chipPadX, chipY + chipH / 2);
     }
-  }, [currentEvent]);
+  }, [currentEvent, detectedBilletId]);
 
   // Overlay animation loop
   useEffect(() => {
@@ -444,50 +463,38 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     };
   }, [renderOverlay, cameraState]);
 
-  // Pause / Resume Frame toggle (supports both GPU Vision MJPEG and Browser Webcam)
+  // Pause / Resume Frame toggle
   const handleTogglePause = useCallback(async () => {
     if (!isPaused) {
-      if (feedSource === 'vision') {
-        const img = visionImgRef.current;
-        let captured = false;
-        if (img) {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth || 1280;
-            canvas.height = img.naturalHeight || 720;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              const dataUrl = canvas.toDataURL('image/jpeg');
-              setFrozenFrameUrl(dataUrl);
-              captured = true;
-            }
-          } catch {
-            // In case canvas capture fails, fallback to snapshot endpoint
+      const img = visionImgRef.current;
+      let captured = false;
+      if (img) {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 1280;
+          canvas.height = img.naturalHeight || 720;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            setFrozenFrameUrl(dataUrl);
+            captured = true;
           }
+        } catch {
+          // Fallback to snapshot endpoint
         }
-        if (!captured) {
-          setFrozenFrameUrl(`${VISION_API_URL}/camera/snapshot?t=${Date.now()}`);
-        }
-      } else {
-        if (videoRef.current) {
-          videoRef.current.pause();
-        }
+      }
+      if (!captured) {
+        setFrozenFrameUrl(`${VISION_API_URL}/camera/snapshot?t=${Date.now()}`);
       }
       setIsPaused(true);
       setCameraState('paused');
     } else {
-      if (feedSource === 'vision') {
-        setFrozenFrameUrl(null);
-      } else {
-        if (videoRef.current) {
-          await videoRef.current.play();
-        }
-      }
+      setFrozenFrameUrl(null);
       setIsPaused(false);
       setCameraState('active');
     }
-  }, [isPaused, feedSource]);
+  }, [isPaused]);
 
   // Render error/loading states
   const renderFallbackState = () => {
@@ -558,7 +565,7 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               {errorMessage}
             </span>
             <button
-              onClick={startBrowserWebcam}
+              onClick={() => window.location.reload()}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -593,6 +600,10 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
   return (
     <div
       ref={containerRef}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       style={{
         position: 'relative',
         width: '100%',
@@ -601,55 +612,40 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         borderRadius: 'var(--radius-card)',
         overflow: 'hidden',
         boxShadow: 'var(--shadow-card)',
+        cursor: isDrawingRoi ? 'crosshair' : 'default',
       }}
       onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
     >
-      {/* Live video element: Python Vision Service (GPU 24+ FPS) or Browser Webcam */}
-      {feedSource === 'vision' ? (
-        isPaused && frozenFrameUrl ? (
-          <img
-            src={frozenFrameUrl}
-            alt="Paused Vision Camera Frame"
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit: 'cover',
-            }}
-          />
-        ) : (
-          <img
-            ref={visionImgRef}
-            crossOrigin="anonymous"
-            src={`${VISION_API_URL}/video_feed`}
-            alt="Live Vision Camera Stream"
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit: 'cover',
-            }}
-            onError={(e) => {
-              // Auto retry stream every 1.5 seconds instead of falling back to laptop camera
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.src = `${VISION_API_URL}/video_feed?retry=${Date.now()}`;
-                }
-              }, 1500);
-            }}
-          />
-        )
-      ) : (
-        <video
-          ref={videoRef}
-          muted
-          playsInline
+      {/* Live video element: Python Vision Service */}
+      {isPaused && frozenFrameUrl ? (
+        <img
+          src={frozenFrameUrl}
+          alt="Paused Vision Camera Frame"
           style={{
             width: '100%',
             height: '100%',
             display: 'block',
             objectFit: 'cover',
+          }}
+        />
+      ) : (
+        <img
+          ref={visionImgRef}
+          crossOrigin="anonymous"
+          src={`${VISION_API_URL}/video_feed`}
+          alt="Live Vision Camera Stream"
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            objectFit: 'cover',
+          }}
+          onError={(e) => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.src = `${VISION_API_URL}/video_feed?retry=${Date.now()}`;
+              }
+            }, 1500);
           }}
         />
       )}
@@ -666,6 +662,40 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
           zIndex: 2,
         }}
       />
+
+      {/* Current Static Custom ROI Highlight */}
+      {!isDrawingRoi && customRoi && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${customRoi.x1 * 100}%`,
+            top: `${customRoi.y1 * 100}%`,
+            width: `${(customRoi.x2 - customRoi.x1) * 100}%`,
+            height: `${(customRoi.y2 - customRoi.y1) * 100}%`,
+            border: '1px dashed rgba(255, 255, 255, 0.4)',
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            pointerEvents: 'none',
+            zIndex: 3,
+          }}
+        />
+      )}
+
+      {/* Active Drawing ROI Highlight */}
+      {isDrawingRoi && roiStart && roiCurrent && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${Math.min(roiStart.x, roiCurrent.x) * 100}%`,
+            top: `${Math.min(roiStart.y, roiCurrent.y) * 100}%`,
+            width: `${Math.abs(roiCurrent.x - roiStart.x) * 100}%`,
+            height: `${Math.abs(roiCurrent.y - roiStart.y) * 100}%`,
+            border: '2px solid #3DDC84',
+            backgroundColor: 'rgba(61, 220, 132, 0.2)',
+            pointerEvents: 'none',
+            zIndex: 4,
+          }}
+        />
+      )}
 
       {/* Paused Frame Indicator Overlay */}
       {isPaused && (
@@ -798,43 +828,68 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          {/* Persistent USB Camera / Webcam Toggle Button */}
-          <button
-            onClick={() => {
-              if (feedSource === 'vision') {
-                startBrowserWebcam();
-              } else {
-                setFeedSource('vision');
-                if (streamRef.current) {
-                  streamRef.current.getTracks().forEach((track) => track.stop());
-                  streamRef.current = null;
+          {/* ROI Draw Toggle */}
+          {showControls && (
+            <button
+              onClick={() => {
+                if (isDrawingRoi) {
+                  setIsDrawingRoi(false);
+                  setRoiStart(null);
+                  setRoiCurrent(null);
+                } else {
+                  setIsDrawingRoi(true);
                 }
-                setCameraState('active');
-              }
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              height: '28px',
-              padding: '0 10px',
-              borderRadius: 'var(--radius-control)',
-              backgroundColor: feedSource === 'vision' ? 'rgba(61, 220, 132, 0.22)' : 'rgba(255, 255, 255, 0.12)',
-              border: feedSource === 'vision' ? '1px solid rgba(61, 220, 132, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#FFFFFF',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            title="Switch between USB Camera (GPU Vision) and Browser Webcam"
-          >
-            <RefreshCw size={12} />
-            <span>{feedSource === 'vision' ? 'USB Camera (Active)' : 'Switch to USB Cam'}</span>
-          </button>
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: isDrawingRoi ? 'rgba(61, 220, 132, 0.22)' : 'rgba(255, 255, 255, 0.12)',
+                border: isDrawingRoi ? '1px solid rgba(61, 220, 132, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#FFFFFF',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Draw Custom ROI"
+            >
+              <Crop size={14} />
+              {isDrawingRoi ? 'Cancel Drawing' : 'Draw ROI'}
+            </button>
+          )}
+
+          {/* Calibrate Button */}
+          {showControls && (
+            <button
+              onClick={handleCalibrate}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: 'rgba(56, 189, 248, 0.22)',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                color: '#FFFFFF',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Calibrate Camera PPM"
+            >
+              <Target size={14} />
+              Calibrate
+            </button>
+          )}
 
           {/* Focus Control Button (for USB Camera) */}
-          {feedSource === 'vision' && (
+          {showControls && (
             <button
               onClick={() => setShowFocusControls(!showFocusControls)}
               style={{
@@ -889,12 +944,12 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               height: '28px',
               padding: '0 12px',
               borderRadius: 'var(--radius-pill)',
-              backgroundColor: feedSource === 'vision' ? 'rgba(61, 220, 132, 0.15)' : 'rgba(255, 255, 255, 0.1)',
-              border: feedSource === 'vision' ? '1px solid rgba(61, 220, 132, 0.35)' : '1px solid transparent',
+              backgroundColor: 'rgba(61, 220, 132, 0.15)',
+              border: '1px solid rgba(61, 220, 132, 0.35)',
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--space-2)',
-              color: feedSource === 'vision' ? '#3DDC84' : '#FFFFFF',
+              color: '#3DDC84',
               fontSize: '0.8125rem',
               fontWeight: 600,
               letterSpacing: '0.04em',
@@ -915,15 +970,13 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               }}
             />
             <span>
-              {feedSource === 'vision'
-                ? 'GPU VISION (RTX 4050)'
-                : cameraState === 'active'
-                  ? 'LIVE WEBCAM'
-                  : cameraState === 'paused'
-                    ? 'PAUSED'
-                    : cameraState === 'initializing'
-                      ? 'CONNECTING'
-                      : 'OFFLINE'}
+              {cameraState === 'active'
+                ? 'LIVE VISION PIPELINE'
+                : cameraState === 'paused'
+                  ? 'PAUSED'
+                  : cameraState === 'initializing'
+                    ? 'CONNECTING'
+                    : 'OFFLINE'}
             </span>
           </div>
 
@@ -933,19 +986,17 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
               style={{
                 fontSize: '0.875rem',
                 fontWeight: 500,
-                color: feedSource === 'vision' ? '#3DDC84' : 'var(--text-on-dark-muted)',
+                color: '#3DDC84',
               }}
             >
-              {feedSource === 'vision'
-                ? `FPS: ${liveGpuFps > 0 ? liveGpuFps.toFixed(0) : '30'} (${inferenceMs > 0 ? inferenceMs.toFixed(1) : '8.3'}ms)`
-                : `FPS: ${cameraState === 'active' ? fps : 0}`}
+              {`FPS: ${liveGpuFps > 0 ? liveGpuFps.toFixed(0) : '30'} (${inferenceMs > 0 ? inferenceMs.toFixed(1) : '8.3'}ms)`}
             </div>
           )}
         </div>
       </div>
 
       {/* Focus Control Drawer / Popover */}
-      {showFocusControls && feedSource === 'vision' && (
+      {showFocusControls && (
         <div
           style={{
             position: 'absolute',
@@ -1085,40 +1136,6 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
             zIndex: 20,
           }}
         >
-          {visionAvailable && (
-            <button
-              onClick={() => {
-                if (feedSource === 'vision') {
-                  startBrowserWebcam();
-                } else {
-                  setFeedSource('vision');
-                  if (streamRef.current) {
-                    streamRef.current.getTracks().forEach((track) => track.stop());
-                    streamRef.current = null;
-                  }
-                  setCameraState('active');
-                }
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 8px',
-                borderRadius: 'var(--radius-control)',
-                backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                color: '#FFFFFF',
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              title="Toggle Feed Source"
-            >
-              <RefreshCw size={13} />
-              <span>{feedSource === 'vision' ? 'Switch to Webcam' : 'Switch to GPU Vision'}</span>
-            </button>
-          )}
-
           <button
             onClick={handleTogglePause}
             style={{

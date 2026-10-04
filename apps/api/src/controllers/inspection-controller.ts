@@ -26,6 +26,29 @@ export const ingestInspection = (req: Request, res: Response) => {
   res.status(201).json({ data: event });
 };
 
+export const calibrateCamera = async (req: Request, res: Response) => {
+  try {
+    const { reference_width_mm, roi } = req.body;
+    const response = await fetch('http://localhost:8003/calibrate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reference_width_mm: reference_width_mm || 150.0, roi }),
+    });
+    
+    const data = await response.json().catch(() => null);
+    if (response.ok) {
+      res.json(data);
+    } else {
+      res.status(response.status).json(data || { error: `Decision engine returned status ${response.status}` });
+    }
+  } catch (error) {
+    console.error('Calibration proxy error:', error);
+    res.status(502).json({ error: 'Failed to reach decision-engine on port 8003 for calibration' });
+  }
+};
+
 export const getHealth = (_req: Request, res: Response) => {
   res.json({
     status: 'online',

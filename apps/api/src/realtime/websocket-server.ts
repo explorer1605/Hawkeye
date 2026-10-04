@@ -29,8 +29,7 @@ export class RealtimeManager {
       });
     });
 
-    // Start background stream simulation broadcasting every 5 seconds
-    this.startBroadcastLoop();
+    // Real events are broadcasted when decision engine calls ingestInspection
   }
 
   public broadcast(type: string, data: unknown) {
@@ -41,13 +40,6 @@ export class RealtimeManager {
         client.send(payload);
       }
     }
-  }
-
-  private startBroadcastLoop() {
-    this.intervalTimer = setInterval(() => {
-      const event: InspectionEvent = inspectionService.generateRandomEvent();
-      this.broadcast('NEW_INSPECTION', event);
-    }, 5000);
   }
 
   public close() {
