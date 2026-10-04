@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { InspectionEvent, AlertItem } from '@hawkeye/shared';
 import { simulationEngine } from '@/lib/realtime/simulation-engine';
+import { alarmService } from '@/lib/alarm-service';
 import { AppHeader, type NavTab } from '@/components/layout/AppHeader';
 import { CameraFeed, CurrentInspection } from '@/features/live-inspection';
 import { LiveAlerts } from '@/features/alerts';
@@ -18,20 +19,35 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<InspectionEvent[]>(() =>
     simulationEngine.getHistory()
   );
+  const [isAlarmActive, setIsAlarmActive] = useState<boolean>(() => alarmService.getIsAlarmActive());
+  const [activeAlarmInfo, setActiveAlarmInfo] = useState(() => alarmService.getActiveAlarmInfo());
 
   useEffect(() => {
     const unsubInspection = simulationEngine.subscribeInspection((newEvent) => {
       setCurrentEvent(newEvent);
       setHistory(simulationEngine.getHistory());
+      // Trigger plant audio/visual alarm if FAIL or defect
+      if (newEvent.status !== 'PASS') {
+        alarmService.trigger(newEvent.status, {
+          billetId: newEvent.billetId,
+          title: newEvent.defect !== 'None' ? newEvent.defect : 'Tolerance Violation',
+        });
+      }
     });
 
     const unsubAlert = simulationEngine.subscribeAlert(() => {
       setAlerts(simulationEngine.getAlerts());
     });
 
+    const unsubAlarm = alarmService.subscribe(() => {
+      setIsAlarmActive(alarmService.getIsAlarmActive());
+      setActiveAlarmInfo(alarmService.getActiveAlarmInfo());
+    });
+
     return () => {
       unsubInspection();
       unsubAlert();
+      unsubAlarm();
     };
   }, []);
 
@@ -49,6 +65,51 @@ export const App: React.FC = () => {
         onTabChange={setActiveTab}
         systemStatus="online"
       />
+
+      {/* Industrial Active Alarm Alert Strip */}
+      {isAlarmActive && (
+        <div
+          style={{
+            backgroundColor: '#C4302B',
+            color: '#FFFFFF',
+            padding: '8px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.8125rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            boxShadow: '0 2px 8px rgba(196, 48, 43, 0.3)',
+            zIndex: 40,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span>CRITICAL PLANT ALARM:</span>
+            <span>
+              {activeAlarmInfo.billetId ? `[${activeAlarmInfo.billetId}] ` : ''}
+              {activeAlarmInfo.title ?? 'Spec tolerance violation detected on line'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => alarmService.acknowledgeAlarm()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              color: '#C4302B',
+              border: 'none',
+              padding: '4px 12px',
+              borderRadius: 'var(--radius-control)',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              letterSpacing: '0.05em',
+            }}
+          >
+            ACKNOWLEDGE & SILENCE
+          </button>
+        </div>
+      )}
 
       <main
         style={{
