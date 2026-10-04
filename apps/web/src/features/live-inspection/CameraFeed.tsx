@@ -88,6 +88,56 @@ export const CameraFeed: React.FC<CameraFeedProps> = ({ currentEvent, fps = 24 }
     };
   }, [startCamera]);
 
+  // Broadcast webcam feed to Hawkeye Mobile App (Bridge on port 8080)
+  useEffect(() => {
+    if (cameraState !== 'active') return;
+
+    let ws: WebSocket | null = null;
+    let intervalId: any = null;
+    const captureCanvas = document.createElement('canvas');
+    const captureCtx = captureCanvas.getContext('2d');
+
+    const connectAndStream = () => {
+      try {
+        ws = new WebSocket('ws://localhost:8080');
+
+        ws.onopen = () => {
+          // Stream at 25 FPS with optimized JPEG compression
+          intervalId = setInterval(() => {
+            const video = videoRef.current;
+            if (video && video.readyState >= 2 && ws && ws.readyState === WebSocket.OPEN) {
+              captureCanvas.width = 640;
+              captureCanvas.height = 360;
+              captureCtx?.drawImage(video, 0, 0, 640, 360);
+              const frameData = captureCanvas.toDataURL('image/jpeg', 0.65);
+              ws.send(JSON.stringify({
+                type: 'frame',
+                data: frameData,
+                timestamp: Date.now(),
+              }));
+            }
+          }, 40);
+        };
+
+        ws.onerror = () => { };
+        ws.onclose = () => {
+          if (intervalId) clearInterval(intervalId);
+          setTimeout(connectAndStream, 3000); // auto-reconnect
+        };
+      } catch (err) {
+        console.warn('Bridge connect error:', err);
+      }
+    };
+
+    connectAndStream();
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (ws) ws.close();
+    };
+  }, [cameraState]);
+
+
   // Draw bounding box overlay on the canvas
   const renderOverlay = useCallback(() => {
     const canvas = overlayCanvasRef.current;

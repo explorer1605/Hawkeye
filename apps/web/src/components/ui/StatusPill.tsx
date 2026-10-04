@@ -9,34 +9,26 @@ interface StatusPillProps {
 
 const STATUS_CONFIG: Record<
   InspectionStatus,
-  { dot: string; text: string; bg: string; border: string; label: string }
+  { bg: string; text: string; label: string }
 > = {
   PASS: {
-    dot: 'var(--status-pass)',
-    text: '#0E5C33',
-    bg: 'rgba(20, 122, 69, 0.08)',
-    border: 'rgba(20, 122, 69, 0.25)',
+    bg: '#147A45',
+    text: '#FFFFFF',
     label: 'PASS',
   },
   FAIL: {
-    dot: 'var(--status-fail)',
-    text: '#9E211C',
-    bg: 'rgba(196, 48, 43, 0.08)',
-    border: 'rgba(196, 48, 43, 0.25)',
+    bg: '#C4302B',
+    text: '#FFFFFF',
     label: 'FAIL',
   },
   REWORK: {
-    dot: 'var(--status-rework)',
-    text: '#854D0E',
-    bg: 'rgba(242, 163, 58, 0.12)',
-    border: 'rgba(242, 163, 58, 0.35)',
+    bg: '#D97706',
+    text: '#FFFFFF',
     label: 'REWORK',
   },
   REVIEW: {
-    dot: 'var(--status-review)',
-    text: '#1B4DB0',
-    bg: 'rgba(47, 111, 237, 0.08)',
-    border: 'rgba(47, 111, 237, 0.25)',
+    bg: '#2563EB',
+    text: '#FFFFFF',
     label: 'REVIEW',
   },
 };
@@ -51,21 +43,21 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, className = '' }
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '22px',
-        padding: '0 8px',
+        height: '24px',
+        padding: '0 10px',
         borderRadius: 'var(--radius-control)',
         backgroundColor: config.bg,
-        border: `1px solid ${config.border}`,
         color: config.text,
         fontSize: '0.75rem',
         lineHeight: 1,
-        fontWeight: 600,
+        fontWeight: 700,
         fontFamily: 'var(--font-mono)',
         textTransform: 'uppercase',
-        letterSpacing: '0.04em',
+        letterSpacing: '0.05em',
         fontVariantNumeric: 'tabular-nums',
         whiteSpace: 'nowrap',
         userSelect: 'none',
+        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
       }}
     >
       {config.label}

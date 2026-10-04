@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatDateTime } from '@/lib/format';
+import { alarmService } from '@/lib/alarm-service';
 import logoImg from '@/assets/logo.png';
 
 export type NavTab = 'live' | 'analytics' | 'log';
@@ -17,6 +18,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   systemStatus = 'online',
 }) => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [isAlarmActive, setIsAlarmActive] = useState<boolean>(() => alarmService.getIsAlarmActive());
+  const [isMuted, setIsMuted] = useState<boolean>(() => alarmService.getIsMuted());
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -24,6 +27,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = alarmService.subscribe(() => {
+      setIsAlarmActive(alarmService.getIsAlarmActive());
+      setIsMuted(alarmService.getIsMuted());
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleAlarmClick = () => {
+    if (isAlarmActive) {
+      alarmService.acknowledgeAlarm();
+    } else {
+      alarmService.toggleMute();
+    }
+  };
 
   const navItems: { id: NavTab; label: string }[] = [
     {
@@ -148,9 +167,60 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 'var(--space-5)',
+            gap: 'var(--space-4)',
           }}
         >
+          {/* Industrial Alarm Controller */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={handleAlarmClick}
+              title={
+                isAlarmActive
+                  ? 'Click to acknowledge and silence alarm'
+                  : isMuted
+                  ? 'Alarm sound is muted. Click to arm'
+                  : 'Alarm is armed. Click to mute'
+              }
+              style={{
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: 'var(--radius-control)',
+                backgroundColor: isAlarmActive
+                  ? '#C4302B'
+                  : isMuted
+                  ? 'rgba(255, 255, 255, 0.05)'
+                  : 'rgba(20, 122, 69, 0.2)',
+                border: isAlarmActive
+                  ? '1px solid #FF6B63'
+                  : isMuted
+                  ? '1px solid rgba(255, 255, 255, 0.15)'
+                  : '1px solid rgba(61, 220, 132, 0.4)',
+                color: isAlarmActive
+                  ? '#FFFFFF'
+                  : isMuted
+                  ? 'var(--text-on-dark-muted)'
+                  : 'var(--overlay-pass)',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 150ms ease-out',
+                animation: isAlarmActive ? 'alarmPulse 1s infinite alternate' : 'none',
+              }}
+            >
+              {isAlarmActive
+                ? 'SILENCE ALARM'
+                : isMuted
+                ? 'ALARM: MUTED'
+                : 'ALARM: ARMED'}
+            </button>
+          </div>
+
+          {/* System Online Status */}
           <div
             style={{
               display: 'flex',
@@ -192,6 +262,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes alarmPulse {
+          0% { background-color: #C4302B; transform: scale(1); }
+          100% { background-color: #E63946; transform: scale(1.03); }
+        }
+      `}</style>
     </header>
   );
 };
